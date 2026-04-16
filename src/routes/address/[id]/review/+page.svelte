@@ -6,16 +6,33 @@
   let rating = $state(3);
   let body = $state('');
   let visitedAt = $state(new Date().toISOString().slice(0, 10));
+  let photos = $state<File[]>([]);
+  let fileInput = $state<HTMLInputElement>();
   let loading = $state(false);
   let error = $state('');
 
   const addressId = $derived($page.params.id);
+
+  function addPhotos(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const files = Array.from(target.files || []);
+    if (photos.length + files.length > 5) {
+      error = 'Maximum 5 photos per review';
+      return;
+    }
+    photos = [...photos, ...files];
+  }
+
+  function removePhoto(index: number) {
+    photos = photos.filter((_, i) => i !== index);
+  }
 
   async function submit() {
     loading = true;
     error = '';
 
     try {
+      // Create the review
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -32,6 +49,27 @@
         const data = await res.json();
         error = data.error || 'Failed to submit review';
         return;
+      }
+
+      const review = await res.json();
+
+      // Upload photos if any
+      if (photos.length > 0) {
+        const formData = new FormData();
+        formData.append('review_id', review.id);
+        for (const photo of photos) {
+          formData.append('photos', photo);
+        }
+
+        const photoRes = await fetch('/api/photos', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!photoRes.ok) {
+          // Review was created but photos failed — still navigate
+          console.error('Photo upload failed:', await photoRes.text());
+        }
       }
 
       goto(`/address/${addressId}`);
@@ -92,6 +130,39 @@
     <div class="form-group">
       <label for="visited">Date visited</label>
       <input type="date" id="visited" bind:value={visitedAt} />
+    </div>
+
+    <div class="form-group">
+      <label>Photos (up to 5)</label>
+      <div class="photo-upload">
+        {#if photos.length > 0}
+          <div class="photo-previews">
+            {#each photos as photo, i}
+              <div class="photo-preview">
+                <img src={URL.createObjectURL(photo)} alt="Preview" />
+                <button type="button" class="remove-photo" onclick={() => removePhoto(i)}>×</button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+        {#if photos.length < 5}
+          <button
+            type="button"
+            class="add-photo-btn"
+            onclick={() => fileInput?.click()}
+          >
+            + Add Photos
+          </button>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            multiple
+            bind:this={fileInput}
+            onchange={addPhotos}
+            style="display: none;"
+          />
+        {/if}
+      </div>
     </div>
 
     {#if error}
@@ -245,5 +316,66 @@
   .cancel-link {
     color: var(--text-muted);
     font-size: 0.9rem;
+  }
+
+  .photo-upload {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .photo-previews {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .photo-preview {
+    position: relative;
+    width: 100px;
+    height: 75px;
+  }
+
+  .photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .remove-photo {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .add-photo-btn {
+    padding: 0.75rem 1rem;
+    background: none;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-family: var(--font-family);
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .add-photo-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
   }
 </style>

@@ -15,14 +15,54 @@
     return 'Inaccurate';
   }
 
+  let showAddListing = $state(false);
+  let listingUrl = $state('');
+  let listingPrice = $state('');
+  let listingError = $state('');
+
   async function vote(reviewId: string, voteType: 'accurate' | 'not_accurate') {
     await fetch('/api/votes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ review_id: reviewId, vote: voteType })
     });
-    // Reload to get updated counts
     location.reload();
+  }
+
+  async function addListing() {
+    listingError = '';
+    try {
+      const res = await fetch('/api/listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address_id: data.address.id,
+          url: listingUrl,
+          price: listingPrice || null
+        })
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        listingError = d.error || 'Failed to add listing';
+        return;
+      }
+      location.reload();
+    } catch {
+      listingError = 'Network error';
+    }
+  }
+
+  async function deleteListing(id: string) {
+    await fetch(`/api/listings?id=${id}`, { method: 'DELETE' });
+    location.reload();
+  }
+
+  function sourceIcon(source: string) {
+    const icons: Record<string, string> = {
+      zillow: 'Z', redfin: 'R', realtor: 'R', trulia: 'T',
+      apartments: 'A', craigslist: 'CL', facebook: 'FB', hotpads: 'HP'
+    };
+    return icons[source] || '🔗';
   }
 </script>
 
@@ -54,6 +94,62 @@
   {:else}
     <a href="/login" class="review-button secondary">Log in to leave a review</a>
   {/if}
+
+  <section class="listings">
+    <div class="section-header">
+      <h2>Listings</h2>
+      {#if data.user}
+        <button class="add-listing-btn" onclick={() => showAddListing = !showAddListing}>
+          {showAddListing ? 'Cancel' : '+ Add Listing'}
+        </button>
+      {/if}
+    </div>
+
+    {#if showAddListing}
+      <div class="add-listing-form">
+        <input
+          type="url"
+          placeholder="Paste listing URL (Zillow, Redfin, Craigslist, etc.)"
+          bind:value={listingUrl}
+          class="listing-input"
+        />
+        <input
+          type="text"
+          placeholder="Price (optional, e.g., $2,400/mo)"
+          bind:value={listingPrice}
+          class="listing-input price-input"
+        />
+        {#if listingError}
+          <div class="listing-error">{listingError}</div>
+        {/if}
+        <button class="submit-listing-btn" onclick={addListing} disabled={!listingUrl}>
+          Add Listing
+        </button>
+      </div>
+    {/if}
+
+    {#if data.listings.length === 0 && !showAddListing}
+      <p class="empty">No listings linked yet.</p>
+    {:else}
+      {#each data.listings as listing}
+        <div class="listing-card">
+          <span class="listing-source">{sourceIcon(listing.source)}</span>
+          <div class="listing-info">
+            <a href={listing.url} target="_blank" rel="noopener" class="listing-url">
+              {listing.source !== 'other' ? listing.source.charAt(0).toUpperCase() + listing.source.slice(1) : listing.url}
+            </a>
+            {#if listing.price}
+              <span class="listing-price">{listing.price}</span>
+            {/if}
+            <span class="listing-meta">added by {listing.username}</span>
+          </div>
+          {#if data.user?.id === listing.user_id}
+            <button class="listing-delete" onclick={() => deleteListing(listing.id)}>×</button>
+          {/if}
+        </div>
+      {/each}
+    {/if}
+  </section>
 
   <section class="reviews">
     <h2>Reviews</h2>
@@ -278,5 +374,160 @@
   .vote-counts {
     font-size: 0.85rem;
     color: var(--text-muted);
+  }
+
+  .listings {
+    margin-bottom: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .section-header h2 {
+    margin: 0;
+  }
+
+  .add-listing-btn {
+    padding: 0.4rem 0.75rem;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font-family);
+  }
+
+  .add-listing-btn:hover {
+    background: var(--bg-sunken);
+    color: var(--text);
+  }
+
+  .add-listing-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .listing-input {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-family);
+    font-size: 0.95rem;
+  }
+
+  .listing-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .price-input {
+    max-width: 200px;
+  }
+
+  .listing-error {
+    color: var(--danger);
+    font-size: 0.85rem;
+  }
+
+  .submit-listing-btn {
+    align-self: flex-start;
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-family);
+  }
+
+  .submit-listing-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .submit-listing-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .listing-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+  }
+
+  .listing-source {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-sunken);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .listing-info {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .listing-url {
+    font-weight: 600;
+  }
+
+  .listing-price {
+    color: var(--success);
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .listing-meta {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .listing-delete {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .listing-card:hover .listing-delete {
+    opacity: 1;
+  }
+
+  .listing-delete:hover {
+    color: var(--danger);
   }
 </style>
