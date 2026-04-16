@@ -35,15 +35,31 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const results = await res.json();
 
-    return json(results.map((r: any) => ({
-      display_name: r.display_name,
-      street: r.address?.road ? `${r.address.house_number || ''} ${r.address.road}`.trim() : r.display_name,
-      city: r.address?.city || r.address?.town || r.address?.village || '',
-      state: r.address?.state || '',
-      zip: r.address?.postcode || '',
-      lat: r.lat,
-      lon: r.lon
-    })));
+    return json(results
+      .filter((r: any) => {
+        // Only return results that have a street-level address
+        const a = r.address;
+        return a && (a.house_number || a.road);
+      })
+      .map((r: any) => {
+        const a = r.address;
+        const houseNum = a.house_number || '';
+        const road = a.road || '';
+        const street = `${houseNum} ${road}`.trim();
+        const city = a.city || a.town || a.village || a.hamlet || a.suburb || a.county || '';
+        const state = a.state || '';
+        const zip = a.postcode || '';
+
+        return {
+          display_name: [street, city, state, zip].filter(Boolean).join(', '),
+          street,
+          city,
+          state,
+          zip,
+          lat: r.lat,
+          lon: r.lon
+        };
+      }));
   } catch (err) {
     console.error('Geocode error:', err);
     return json([]);
