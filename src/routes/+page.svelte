@@ -12,7 +12,7 @@
 
   function handleInput() {
     clearTimeout(debounceTimer);
-    if (searchQuery.trim().length < 3) {
+    if (searchQuery.trim().length < 5) {
       suggestions = [];
       return;
     }

@@ -6,7 +6,7 @@ let lastRequest = 0;
 
 export const GET: RequestHandler = async ({ url }) => {
   const q = url.searchParams.get('q');
-  if (!q || q.trim().length < 3) {
+  if (!q || q.trim().length < 5) {
     return json([]);
   }
 
@@ -21,7 +21,7 @@ export const GET: RequestHandler = async ({ url }) => {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
-      `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=us`,
+      `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=10&countrycodes=us`,
       {
         headers: {
           'User-Agent': 'Curbside/0.1 (crowd-sourced listing reviews)'
@@ -37,9 +37,9 @@ export const GET: RequestHandler = async ({ url }) => {
 
     return json(results
       .filter((r: any) => {
-        // Only return results that have a street-level address
+        // Only return results with a house number (actual addresses, not just roads)
         const a = r.address;
-        return a && (a.house_number || a.road);
+        return a && a.house_number && a.road;
       })
       .map((r: any) => {
         const a = r.address;
