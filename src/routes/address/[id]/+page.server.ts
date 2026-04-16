@@ -46,12 +46,23 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     ? reviewsResult.rows.reduce((s, r) => s + r.rating, 0) / totalReviews
     : 0;
 
+  // Load listings
+  const listingsResult = await query(
+    `SELECT l.*, u.username
+     FROM address_listings l
+     JOIN users u ON u.id = l.user_id
+     WHERE l.address_id = $1
+     ORDER BY l.created_at DESC`,
+    [params.id]
+  );
+
   return {
     address,
     reviews: reviewsResult.rows.map(r => ({
       ...r,
       photos: photos.filter(p => p.review_id === r.id)
     })),
+    listings: listingsResult.rows,
     stats: {
       totalReviews,
       accuratePercent: totalReviews > 0 ? Math.round((accurateReviews / totalReviews) * 100) : 0,
