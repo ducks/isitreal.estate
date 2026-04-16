@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import { goto } from '$app/navigation';
+  import Map from '$lib/components/Map.svelte';
 
   let { data }: { data: PageData } = $props();
 
@@ -31,7 +32,6 @@
   }
 
   async function selectAddress(suggestion: any) {
-    // Create or find address, then navigate
     const res = await fetch('/api/addresses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -49,6 +49,28 @@
       const address = await res.json();
       goto(`/address/${address.id}`);
     }
+  }
+
+  const mapMarkers = $derived(
+    data.mapAddresses.map((a: any) => ({
+      lat: a.lat,
+      lng: a.lng,
+      id: a.id,
+      label: `${a.street}, ${a.city}${a.state ? `, ${a.state}` : ''}`,
+      reviewCount: a.review_count
+    }))
+  );
+
+  function accuracyLabel(val: string) {
+    if (val === 'yes') return 'Accurate';
+    if (val === 'partially') return 'Partially';
+    return 'Inaccurate';
+  }
+
+  function accuracyColor(val: string) {
+    if (val === 'yes') return 'var(--success)';
+    if (val === 'partially') return 'var(--warning)';
+    return 'var(--danger)';
   }
 </script>
 
@@ -77,9 +99,41 @@
     </div>
   </div>
 
+  {#if mapMarkers.length > 0}
+    <section class="map-section">
+      <h2>Reviewed Addresses</h2>
+      <div class="map-wrapper">
+        <Map markers={mapMarkers} />
+      </div>
+    </section>
+  {/if}
+
   <section class="recent">
     <h2>Recent Reviews</h2>
-    <p class="empty">No reviews yet. Be the first to review an address.</p>
+    {#if data.recentReviews.length === 0}
+      <p class="empty">No reviews yet. Be the first to review an address.</p>
+    {:else}
+      <div class="reviews-feed">
+        {#each data.recentReviews as review}
+          <a href="/address/{review.address_id}" class="feed-card">
+            <div class="feed-header">
+              <span class="feed-address">{review.street}, {review.city}{review.state ? `, ${review.state}` : ''}</span>
+              <span class="feed-rating">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+            </div>
+            <div class="feed-meta">
+              <span class="feed-accuracy" style="color: {accuracyColor(review.listing_accurate)}">
+                {accuracyLabel(review.listing_accurate)}
+              </span>
+              <span class="feed-author">by {review.username}</span>
+              <span class="feed-date">{new Date(review.created_at).toLocaleDateString()}</span>
+            </div>
+            {#if review.body}
+              <p class="feed-body">{review.body.slice(0, 150)}{review.body.length > 150 ? '...' : ''}</p>
+            {/if}
+          </a>
+        {/each}
+      </div>
+    {/if}
   </section>
 </main>
 
@@ -172,6 +226,22 @@
     border-bottom: none;
   }
 
+  .map-section {
+    margin-bottom: 2rem;
+  }
+
+  .map-section h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+  }
+
+  .map-wrapper {
+    height: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
   .recent {
     padding: 2rem 0;
   }
@@ -187,5 +257,66 @@
     color: var(--text-muted);
     text-align: center;
     padding: 3rem 0;
+  }
+
+  .reviews-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .feed-card {
+    display: block;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s;
+  }
+
+  .feed-card:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+
+  .feed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .feed-address {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .feed-rating {
+    color: var(--warning);
+    font-size: 0.95rem;
+  }
+
+  .feed-meta {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feed-accuracy {
+    font-weight: 600;
+  }
+
+  .feed-author, .feed-date {
+    color: var(--text-muted);
+  }
+
+  .feed-body {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.5;
   }
 </style>

@@ -21,7 +21,7 @@ export const GET: RequestHandler = async ({ url }) => {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
-      `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=us`,
+      `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=10&countrycodes=us`,
       {
         headers: {
           'User-Agent': 'Curbside/0.1 (crowd-sourced listing reviews)'
@@ -35,15 +35,31 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const results = await res.json();
 
-    return json(results.map((r: any) => ({
-      display_name: r.display_name,
-      street: r.address?.road ? `${r.address.house_number || ''} ${r.address.road}`.trim() : r.display_name,
-      city: r.address?.city || r.address?.town || r.address?.village || '',
-      state: r.address?.state || '',
-      zip: r.address?.postcode || '',
-      lat: r.lat,
-      lon: r.lon
-    })));
+    return json(results
+      .filter((r: any) => {
+        // Only return results with a house number (actual addresses, not just roads)
+        const a = r.address;
+        return a && a.house_number && a.road;
+      })
+      .map((r: any) => {
+        const a = r.address;
+        const houseNum = a.house_number || '';
+        const road = a.road || '';
+        const street = `${houseNum} ${road}`.trim();
+        const city = a.city || a.town || a.village || a.hamlet || a.suburb || a.county || '';
+        const state = a.state || '';
+        const zip = a.postcode || '';
+
+        return {
+          display_name: [street, city, state, zip].filter(Boolean).join(', '),
+          street,
+          city,
+          state,
+          zip,
+          lat: r.lat,
+          lon: r.lon
+        };
+      }));
   } catch (err) {
     console.error('Geocode error:', err);
     return json([]);
