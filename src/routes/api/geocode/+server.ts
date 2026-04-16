@@ -6,7 +6,7 @@ let lastRequest = 0;
 
 export const GET: RequestHandler = async ({ url }) => {
   const q = url.searchParams.get('q');
-  if (!q || q.trim().length < 5) {
+  if (!q || q.trim().length < 3) {
     return json([]);
   }
 
