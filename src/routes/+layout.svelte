@@ -37,6 +37,9 @@
         <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
           {theme === 'dark' ? '☀' : '☾'}
         </button>
+        {#if data.user.is_admin}
+          <a href="/admin" class="nav-link">Admin</a>
+        {/if}
         <a href="/user/{data.user.username}" class="nav-link">{data.user.username}</a>
         <button class="nav-button" onclick={handleLogout}>Log out</button>
       {:else}

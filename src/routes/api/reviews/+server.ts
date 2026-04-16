@@ -22,3 +22,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   return json(result.rows[0], { status: 201 });
 };
+
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+  if (!locals.user) {
+    return json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const id = url.searchParams.get('id');
+  if (!id) {
+    return json({ error: 'Missing id' }, { status: 400 });
+  }
+
+  // Allow review owner or admin to delete
+  if (locals.user.is_admin) {
+    await query('DELETE FROM reviews WHERE id = $1', [id]);
+  } else {
+    await query('DELETE FROM reviews WHERE id = $1 AND user_id = $2', [id, locals.user.id]);
+  }
+
+  return json({ success: true });
+};

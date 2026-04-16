@@ -30,6 +30,27 @@
     location.reload();
   }
 
+  let reportingReviewId = $state<string | null>(null);
+  let reportReason = $state('');
+
+  async function submitReport(reviewId: string) {
+    if (!reportReason.trim()) return;
+    await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ review_id: reviewId, reason: reportReason })
+    });
+    reportingReviewId = null;
+    reportReason = '';
+    alert('Report submitted. Thank you.');
+  }
+
+  async function adminDeleteReview(reviewId: string) {
+    if (!confirm('Delete this review? This cannot be undone.')) return;
+    await fetch(`/api/reviews?id=${reviewId}`, { method: 'DELETE' });
+    location.reload();
+  }
+
   async function addListing() {
     listingError = '';
     try {
@@ -205,12 +226,38 @@
               <button class="vote-btn" onclick={() => vote(review.id, 'not_accurate')}>
                 Not Accurate ({review.not_accurate_count})
               </button>
+              <button
+                class="vote-btn report-btn"
+                onclick={() => { reportingReviewId = reportingReviewId === review.id ? null : review.id; reportReason = ''; }}
+              >
+                Report
+              </button>
+              {#if data.user.is_admin}
+                <button class="vote-btn admin-btn" onclick={() => adminDeleteReview(review.id)}>
+                  Delete
+                </button>
+              {/if}
             {:else}
               <span class="vote-counts">
                 {review.accurate_count} accurate / {review.not_accurate_count} not accurate
               </span>
             {/if}
           </div>
+          {#if reportingReviewId === review.id}
+            <div class="report-form">
+              <input
+                type="text"
+                class="report-input"
+                placeholder="Why are you reporting this review?"
+                bind:value={reportReason}
+              />
+              <button
+                class="report-submit"
+                onclick={() => submitReport(review.id)}
+                disabled={!reportReason.trim()}
+              >Submit Report</button>
+            </div>
+          {/if}
         </div>
       {/each}
     {/if}
@@ -393,6 +440,70 @@
   .vote-counts {
     font-size: 0.85rem;
     color: var(--text-muted);
+  }
+
+  .report-btn {
+    margin-left: auto;
+    color: var(--text-muted);
+    border-color: transparent;
+  }
+
+  .report-btn:hover {
+    color: var(--warning);
+    border-color: var(--warning);
+    background: none;
+  }
+
+  .admin-btn {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  .admin-btn:hover {
+    background: var(--danger);
+    color: var(--text-inverse);
+  }
+
+  .report-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .report-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-family);
+    font-size: 0.85rem;
+  }
+
+  .report-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .report-submit {
+    padding: 0.5rem 0.75rem;
+    background: var(--warning);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-family);
+    white-space: nowrap;
+  }
+
+  .report-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .listings {
