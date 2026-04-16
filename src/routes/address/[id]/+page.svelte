@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from './$types';
+  import Map from '$lib/components/Map.svelte';
 
   let { data }: { data: PageData } = $props();
 
@@ -88,6 +89,17 @@
       </div>
     {/if}
   </div>
+
+  {#if data.address.lat && data.address.lng}
+    <div class="address-map">
+      <Map
+        center={[data.address.lat, data.address.lng]}
+        zoom={16}
+        markers={[{ lat: data.address.lat, lng: data.address.lng, id: data.address.id, label: data.address.street }]}
+        singlePin={true}
+      />
+    </div>
+  {/if}
 
   {#if data.user}
     <a href="/address/{data.address.id}/review" class="review-button">Leave a Review</a>
@@ -250,6 +262,13 @@
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+
+  .address-map {
+    height: 250px;
+    margin-bottom: 1.5rem;
+    border-radius: 12px;
+    overflow: hidden;
   }
 
   .review-button {
