@@ -5,8 +5,8 @@
 </script>
 
 <svelte:head>
-  <title>{data.profile.username} — Curbside</title>
-  <meta name="description" content="{data.reviews.length} review{data.reviews.length !== 1 ? 's' : ''} by {data.profile.username} on Curbside." />
+  <title>{data.profile.username} — Is It Real?</title>
+  <meta name="description" content="{data.reviews.length} review{data.reviews.length !== 1 ? 's' : ''} by {data.profile.username} on isitreal.estate." />
 </svelte:head>
 
 <main>

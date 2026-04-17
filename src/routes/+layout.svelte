@@ -31,7 +31,7 @@
 
 <header>
   <div class="container">
-    <a href="/" class="brand">Curbside</a>
+    <a href="/" class="brand">Is It Real?</a>
     <nav>
       {#if data.user}
         <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
@@ -57,7 +57,7 @@
 
 <footer>
   <div class="footer-container">
-    <span>Curbside — crowd-sourced listing reviews</span>
+    <span>isitreal.estate — crowd-sourced listing reviews</span>
     <span class="footer-links">
       <a href="/">Home</a>
     </span>

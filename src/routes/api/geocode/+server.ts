@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ url }) => {
       `q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=10&countrycodes=us`,
       {
         headers: {
-          'User-Agent': 'Curbside/0.1 (crowd-sourced listing reviews)'
+          'User-Agent': 'IsItReal/0.1 (isitreal.estate - crowd-sourced listing reviews)'
         }
       }
     );

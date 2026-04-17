@@ -90,7 +90,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.address.street}, {data.address.city}{data.address.state ? `, ${data.address.state}` : ''} — Curbside</title>
+  <title>{data.address.street}, {data.address.city}{data.address.state ? `, ${data.address.state}` : ''} — Is It Real?</title>
   <meta name="description" content="{data.stats.totalReviews} review{data.stats.totalReviews !== 1 ? 's' : ''} for {data.address.street}, {data.address.city}. {data.stats.accuratePercent}% say listings are accurate." />
 </svelte:head>
 
