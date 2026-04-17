@@ -4,6 +4,11 @@
   let { data }: { data: PageData } = $props();
 </script>
 
+<svelte:head>
+  <title>{data.profile.username} — Curbside</title>
+  <meta name="description" content="{data.reviews.length} review{data.reviews.length !== 1 ? 's' : ''} by {data.profile.username} on Curbside." />
+</svelte:head>
+
 <main>
   <div class="profile-header">
     <h1>{data.profile.username}</h1>
