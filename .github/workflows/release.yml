@@ -44,14 +44,14 @@ jobs:
           cp package.json release/
           cp schema.sql release/
           cd release
-          tar -czf ../curbside.tar.gz .
+          tar -czf ../isitreal-estate.tar.gz .
           cd ..
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: curbside.tar.gz
+          files: isitreal-estate.tar.gz
           draft: false
           prerelease: false
         env:
