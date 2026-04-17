@@ -35,8 +35,19 @@ export const load: PageServerLoad = async ({ locals }) => {
        (SELECT COUNT(*)::int FROM reports) as report_count`
   );
 
+  // All users
+  const usersResult = await query(
+    `SELECT u.id, u.username, u.email, u.is_admin, u.banned, u.ban_reason, u.created_at,
+       COUNT(r.id)::int as review_count
+     FROM users u
+     LEFT JOIN reviews r ON r.user_id = u.id
+     GROUP BY u.id
+     ORDER BY u.created_at DESC`
+  );
+
   return {
     reported: reportedResult.rows,
+    users: usersResult.rows,
     stats: statsResult.rows[0]
   };
 };
