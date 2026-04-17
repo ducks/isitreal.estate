@@ -18,13 +18,17 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     `SELECT r.*,
        u.username,
        COALESCE(SUM(CASE WHEN v.vote = 'accurate' THEN 1 ELSE 0 END), 0)::int as accurate_count,
-       COALESCE(SUM(CASE WHEN v.vote = 'not_accurate' THEN 1 ELSE 0 END), 0)::int as not_accurate_count
+       COALESCE(SUM(CASE WHEN v.vote = 'not_accurate' THEN 1 ELSE 0 END), 0)::int as not_accurate_count,
+       COALESCE(COUNT(rp.id), 0)::int as report_count
      FROM reviews r
      JOIN users u ON u.id = r.user_id
      LEFT JOIN votes v ON v.review_id = r.id
+     LEFT JOIN reports rp ON rp.review_id = r.id
      WHERE r.address_id = $1
      GROUP BY r.id, u.username
-     ORDER BY r.created_at DESC`,
+     ORDER BY (COALESCE(SUM(CASE WHEN v.vote = 'accurate' THEN 1 ELSE 0 END), 0) -
+               COALESCE(SUM(CASE WHEN v.vote = 'not_accurate' THEN 1 ELSE 0 END), 0)) DESC,
+              r.created_at DESC`,
     [params.id]
   );
 
