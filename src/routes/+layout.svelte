@@ -31,7 +31,7 @@
 
 <header>
   <div class="container">
-    <a href="/" class="brand">Curbside</a>
+    <a href="/" class="brand">Is It Real?</a>
     <nav>
       {#if data.user}
         <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
@@ -54,6 +54,15 @@
 </header>
 
 {@render children()}
+
+<footer>
+  <div class="footer-container">
+    <span>isitreal.estate — crowd-sourced listing reviews</span>
+    <span class="footer-links">
+      <a href="/">Home</a>
+    </span>
+  </div>
+</footer>
 
 <style>
   :global(:root) {
@@ -260,5 +269,58 @@
 
   .theme-toggle:hover {
     background: var(--bg-sunken);
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .footer-links a {
+    color: var(--text-muted);
+  }
+
+  .footer-links a:hover {
+    color: var(--text);
+  }
+
+  @media (max-width: 640px) {
+    .container {
+      padding: 0 1rem;
+    }
+
+    .brand {
+      font-size: 1.1rem;
+    }
+
+    nav {
+      gap: 0.5rem;
+    }
+
+    .nav-link, .nav-button {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+    }
+
+    .nav-link.cta {
+      padding: 0.3rem 0.6rem;
+    }
   }
 </style>

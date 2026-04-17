@@ -16,6 +16,7 @@
     return 'Inaccurate';
   }
 
+  let shareText = $state('Share');
   let showAddListing = $state(false);
   let listingUrl = $state('');
   let listingPrice = $state('');
@@ -88,9 +89,19 @@
   }
 </script>
 
+<svelte:head>
+  <title>{data.address.street}, {data.address.city}{data.address.state ? `, ${data.address.state}` : ''} — Is It Real?</title>
+  <meta name="description" content="{data.stats.totalReviews} review{data.stats.totalReviews !== 1 ? 's' : ''} for {data.address.street}, {data.address.city}. {data.stats.accuratePercent}% say listings are accurate." />
+</svelte:head>
+
 <main>
   <div class="address-header">
-    <h1>{data.address.street}</h1>
+    <div class="title-row">
+      <h1>{data.address.street}</h1>
+      <button class="share-btn" onclick={() => { navigator.clipboard.writeText(window.location.href); shareText = 'Copied!'; setTimeout(() => shareText = 'Share', 2000); }}>
+        {shareText}
+      </button>
+    </div>
     <p class="address-detail">{data.address.city}{data.address.state ? `, ${data.address.state}` : ''} {data.address.zip}</p>
 
     {#if data.stats.totalReviews > 0}
@@ -309,6 +320,31 @@
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+
+  .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .share-btn {
+    padding: 0.4rem 0.75rem;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font-family);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .share-btn:hover {
+    background: var(--bg-sunken);
+    color: var(--text);
   }
 
   .address-map {
@@ -659,5 +695,46 @@
 
   .listing-delete:hover {
     color: var(--danger);
+  }
+
+  @media (max-width: 640px) {
+    main {
+      padding: 1.5rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    .stats-row {
+      gap: 1rem;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+    }
+
+    .review-header {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .review-photos {
+      gap: 0.25rem;
+    }
+
+    .review-photo {
+      width: 90px;
+      height: 68px;
+    }
+
+    .report-form {
+      flex-direction: column;
+    }
+
+    .title-row {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
   }
 </style>

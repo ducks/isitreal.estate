@@ -319,4 +319,38 @@
     margin: 0;
     line-height: 1.5;
   }
+
+  @media (max-width: 640px) {
+    .hero {
+      padding: 2rem 0 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+    }
+
+    .search-input {
+      font-size: 1rem;
+      padding: 0.75rem 1rem;
+    }
+
+    .map-wrapper {
+      height: 280px;
+    }
+
+    .feed-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+
+    .feed-meta {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  }
 </style>
