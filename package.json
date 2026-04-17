@@ -1,6 +1,6 @@
 {
   "name": "curbside",
-  "version": "2026.04.17.0",
+  "version": "2026.04.17.1",
   "private": true,
   "type": "module",
   "scripts": {
