@@ -1,38 +1,61 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import type { PageData } from './$types';
 
-  let listingAccurate = $state<'yes' | 'partially' | 'no'>('yes');
-  let rating = $state(3);
+  let { data }: { data: PageData } = $props();
+
+  let listingAccurate = $state<'yes' | 'partially' | 'no' | null>(null);
+  let rating = $state(0);
+  let hoverRating = $state(0);
   let body = $state('');
-  let visitedAt = $state(new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  let visitedAt = $state(today);
   let photos = $state<File[]>([]);
-  let fileInput = $state<HTMLInputElement>();
+  let fileInput: HTMLInputElement | undefined;
+  let dragOver = $state(false);
   let loading = $state(false);
-  let error = $state('');
+  let errorMsg = $state('');
 
-  const addressId = $derived($page.params.id);
+  const BODY_MAX = 500;
+  const addressId = data.address.id;
 
-  function addPhotos(e: Event) {
-    const target = e.target as HTMLInputElement;
-    const files = Array.from(target.files || []);
-    if (photos.length + files.length > 5) {
-      error = 'Maximum 5 photos per review';
-      return;
-    }
-    photos = [...photos, ...files];
+  const canSubmit = $derived(
+    !!listingAccurate && rating > 0 && !!visitedAt && !loading
+  );
+
+  function pickPhotos() {
+    fileInput?.click();
   }
 
-  function removePhoto(index: number) {
-    photos = photos.filter((_, i) => i !== index);
+  function onFiles(e: Event) {
+    const files = Array.from((e.target as HTMLInputElement).files || []);
+    addFiles(files);
+    if (fileInput) fileInput.value = '';
+  }
+
+  function addFiles(files: File[]) {
+    const imgs = files.filter((f) => f.type.startsWith('image/'));
+    if (photos.length + imgs.length > 5) {
+      errorMsg = 'maximum 5 photos per review';
+      return;
+    }
+    photos = [...photos, ...imgs];
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    dragOver = false;
+    if (e.dataTransfer?.files) addFiles(Array.from(e.dataTransfer.files));
+  }
+
+  function removePhoto(i: number) {
+    photos = photos.filter((_, idx) => idx !== i);
   }
 
   async function submit() {
     loading = true;
-    error = '';
-
+    errorMsg = '';
     try {
-      // Create the review
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,336 +69,420 @@
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        error = data.error || 'Failed to submit review';
+        const d = await res.json();
+        errorMsg = d.error || 'failed to submit review';
         return;
       }
 
       const review = await res.json();
 
-      // Upload photos if any
       if (photos.length > 0) {
-        const formData = new FormData();
-        formData.append('review_id', review.id);
-        for (const photo of photos) {
-          formData.append('photos', photo);
-        }
-
-        const photoRes = await fetch('/api/photos', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!photoRes.ok) {
-          // Review was created but photos failed — still navigate
-          console.error('Photo upload failed:', await photoRes.text());
-        }
+        const fd = new FormData();
+        fd.append('review_id', review.id);
+        for (const p of photos) fd.append('photos', p);
+        await fetch('/api/photos', { method: 'POST', body: fd });
       }
 
       goto(`/address/${addressId}`);
     } catch {
-      error = 'Network error';
+      errorMsg = 'network error';
     } finally {
       loading = false;
     }
   }
+
+  const ratingLabel = $derived(
+    hoverRating > 0
+      ? `${hoverRating}/5`
+      : rating > 0
+        ? `${rating}/5`
+        : 'tap to rate'
+  );
 </script>
 
-<main>
-  <h1>Leave a Review</h1>
+<svelte:head>
+  <title>Leave a review — isitreal.estate</title>
+</svelte:head>
 
-  <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
-    <div class="form-group">
-      <label>Did the listing match reality?</label>
-      <div class="accuracy-options">
-        <label class="option" class:selected={listingAccurate === 'yes'}>
-          <input type="radio" name="accuracy" value="yes" bind:group={listingAccurate} />
-          Yes, accurate
+<div class="wrap">
+  <div class="card">
+    <div class="crumbs">
+      <a href="/">search</a>
+      <span class="sep">/</span>
+      <a href="/address/{addressId}">{data.address.street}</a>
+      <span class="sep">/</span>
+      <span>review</span>
+    </div>
+
+    <h1>Leave a review</h1>
+    <p class="sub">
+      {data.address.street}{data.address.city ? `, ${data.address.city}` : ''}{data.address.state ? `, ${data.address.state}` : ''}
+    </p>
+
+    <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
+      <!-- Accuracy segmented control -->
+      <div class="field">
+        <label class="lbl">
+          Was the listing accurate? <span class="req">*</span>
         </label>
-        <label class="option" class:selected={listingAccurate === 'partially'}>
-          <input type="radio" name="accuracy" value="partially" bind:group={listingAccurate} />
-          Partially
-        </label>
-        <label class="option" class:selected={listingAccurate === 'no'}>
-          <input type="radio" name="accuracy" value="no" bind:group={listingAccurate} />
-          No, inaccurate
-        </label>
+        <div class="seg" role="radiogroup" aria-label="Listing accurate">
+          {#each [
+            { value: 'yes', label: 'Yes', color: 'green' },
+            { value: 'partially', label: 'Partially', color: 'amber' },
+            { value: 'no', label: 'No', color: 'red' }
+          ] as opt}
+            <button
+              type="button"
+              class="seg-btn {opt.color}"
+              class:selected={listingAccurate === opt.value}
+              onclick={() => (listingAccurate = opt.value as any)}
+              role="radio"
+              aria-checked={listingAccurate === opt.value}
+            >
+              {opt.label}
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label>Overall rating</label>
-      <div class="star-rating">
-        {#each [1, 2, 3, 4, 5] as star}
-          <button
-            type="button"
-            class="star"
-            class:filled={star <= rating}
-            onclick={() => rating = star}
-          >★</button>
-        {/each}
+      <!-- Rating stars -->
+      <div class="field">
+        <label class="lbl">Overall rating <span class="req">*</span></label>
+        <div class="rating">
+          <div class="stars-input" onmouseleave={() => (hoverRating = 0)}>
+            {#each [1, 2, 3, 4, 5] as n}
+              <button
+                type="button"
+                class="star"
+                class:on={n <= (hoverRating || rating)}
+                onmouseenter={() => (hoverRating = n)}
+                onclick={() => (rating = n)}
+                aria-label="{n} star{n !== 1 ? 's' : ''}"
+              >
+                {n <= (hoverRating || rating) ? '★' : '☆'}
+              </button>
+            {/each}
+          </div>
+          <span class="readout">{ratingLabel}</span>
+        </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="body">Your experience</label>
-      <textarea
-        id="body"
-        bind:value={body}
-        rows="5"
-        placeholder="What did you find? How did it compare to the listing?"
-      ></textarea>
-    </div>
+      <!-- Date -->
+      <div class="field">
+        <label class="lbl" for="visitedAt">
+          When did you visit? <span class="req">*</span>
+        </label>
+        <input
+          id="visitedAt"
+          type="date"
+          bind:value={visitedAt}
+          max={today}
+          required
+        />
+      </div>
 
-    <div class="form-group">
-      <label for="visited">Date visited</label>
-      <input type="date" id="visited" bind:value={visitedAt} />
-    </div>
+      <!-- Body -->
+      <div class="field">
+        <label class="lbl" for="body">Tell us what you found</label>
+        <textarea
+          id="body"
+          bind:value={body}
+          placeholder="What matched the listing? What didn't? Be specific — other renters rely on this."
+          rows="5"
+          maxlength={BODY_MAX}
+        ></textarea>
+        <div class="counter">{body.length}/{BODY_MAX}</div>
+      </div>
 
-    <div class="form-group">
-      <label>Photos (up to 5)</label>
-      <div class="photo-upload">
+      <!-- Photos -->
+      <div class="field">
+        <label class="lbl">Add photos</label>
+        <div
+          class="drop"
+          class:over={dragOver}
+          ondragover={(e) => { e.preventDefault(); dragOver = true; }}
+          ondragleave={() => (dragOver = false)}
+          ondrop={onDrop}
+          onclick={pickPhotos}
+          role="button"
+          tabindex="0"
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') pickPhotos(); }}
+        >
+          drop photos here · or click to browse
+        </div>
+        <input
+          bind:this={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          onchange={onFiles}
+          hidden
+        />
+
         {#if photos.length > 0}
-          <div class="photo-previews">
-            {#each photos as photo, i}
-              <div class="photo-preview">
-                <img src={URL.createObjectURL(photo)} alt="Preview" />
-                <button type="button" class="remove-photo" onclick={() => removePhoto(i)}>×</button>
+          <div class="previews">
+            {#each photos as p, i}
+              <div class="preview">
+                <img src={URL.createObjectURL(p)} alt="upload preview" />
+                <button
+                  type="button"
+                  class="x"
+                  onclick={() => removePhoto(i)}
+                  aria-label="Remove photo"
+                >
+                  ×
+                </button>
               </div>
             {/each}
           </div>
         {/if}
-        {#if photos.length < 5}
-          <button
-            type="button"
-            class="add-photo-btn"
-            onclick={() => fileInput?.click()}
-          >
-            + Add Photos
-          </button>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-            multiple
-            bind:this={fileInput}
-            onchange={addPhotos}
-            style="display: none;"
-          />
-        {/if}
       </div>
-    </div>
 
-    {#if error}
-      <div class="error">{error}</div>
-    {/if}
+      {#if errorMsg}
+        <div class="err">{errorMsg}</div>
+      {/if}
 
-    <div class="form-actions">
-      <button type="submit" class="submit-btn" disabled={loading}>
-        {loading ? 'Submitting...' : 'Submit Review'}
-      </button>
-      <a href="/address/{addressId}" class="cancel-link">Cancel</a>
-    </div>
-  </form>
-</main>
+      <div class="foot">
+        <div class="hint">your review is permanent and public. credibility +1 on agreement.</div>
+        <div class="actions">
+          <a href="/address/{addressId}" class="btn-ghost cancel">Cancel</a>
+          <button type="submit" class="btn-primary" disabled={!canSubmit}>
+            {loading ? 'posting…' : 'Post review →'}
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
 
 <style>
-  main {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
+  .wrap {
+    min-height: 70vh;
+    padding: 40px 20px;
+    display: flex;
+    justify-content: center;
   }
 
-  h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    margin: 0 0 2rem;
+  .card {
+    width: 100%;
+    max-width: 640px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 32px;
   }
 
-  .form-group {
-    margin-bottom: 1.5rem;
+  .crumbs {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    margin-bottom: 16px;
+  }
+  .crumbs a { color: var(--fg-mute); }
+  .crumbs a:hover { color: var(--amber); }
+  .crumbs .sep { margin: 0 6px; }
+
+  .card h1 {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px 0;
+  }
+  .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-bottom: 28px;
   }
 
-  .form-group > label {
+  .field {
+    margin-bottom: 20px;
+  }
+
+  .lbl {
     display: block;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 0.5rem;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--fg-mute);
+    margin-bottom: 8px;
   }
+  .req { color: var(--red); }
 
-  .accuracy-options {
+  /* Segmented accuracy */
+  .seg {
     display: flex;
-    gap: 0.5rem;
+    border: 1px solid var(--border);
   }
-
-  .option {
+  .seg-btn {
     flex: 1;
-    padding: 0.75rem;
-    background: var(--bg-raised);
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    text-align: center;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    transition: border-color 0.15s, color 0.15s;
-  }
-
-  .option input {
-    display: none;
-  }
-
-  .option.selected {
-    border-color: var(--accent);
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  .star-rating {
-    display: flex;
-    gap: 0.25rem;
-  }
-
-  .star {
-    background: none;
+    background: transparent;
     border: none;
-    font-size: 2rem;
+    border-right: 1px solid var(--border);
+    color: var(--fg-mute);
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 10px 8px;
     cursor: pointer;
-    color: var(--border);
-    padding: 0;
+  }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn:hover:not(.selected) {
+    background: var(--bg-2);
+    color: var(--fg);
+  }
+  .seg-btn.selected.green { background: var(--green); color: var(--bg); }
+  .seg-btn.selected.amber { background: var(--amber); color: var(--bg); }
+  .seg-btn.selected.red { background: var(--red); color: var(--bg); }
+
+  /* Rating */
+  .rating {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .stars-input {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .star {
+    background: transparent;
+    border: none;
+    padding: 0 3px;
+    font-family: var(--mono);
+    font-size: 28px;
     line-height: 1;
+    color: var(--fg-faint);
+    cursor: pointer;
+  }
+  .star.on { color: var(--amber); }
+  .readout {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
   }
 
-  .star.filled {
-    color: var(--warning);
+  /* Inputs */
+  input[type="date"] {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 8px 10px;
+  }
+  input[type="date"]:focus {
+    outline: none;
+    border-color: var(--amber);
   }
 
   textarea {
     width: 100%;
-    padding: 0.75rem;
+    font-family: var(--sans);
+    font-size: 14px;
+    background: var(--bg-1);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-raised);
-    color: var(--text);
-    font-family: var(--font-family);
-    font-size: 1rem;
+    color: var(--fg);
+    padding: 10px 12px;
+    min-height: 120px;
     resize: vertical;
   }
-
-  textarea::placeholder {
-    color: var(--text-muted);
+  textarea:focus {
+    outline: none;
+    border-color: var(--amber);
+  }
+  .counter {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-align: right;
+    margin-top: 4px;
   }
 
-  input[type="date"] {
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-raised);
-    color: var(--text);
-    font-family: var(--font-family);
-    font-size: 1rem;
-  }
-
-  .error {
-    padding: 0.75rem;
-    background: var(--danger-bg);
-    color: var(--danger);
-    border: 1px solid var(--danger-border);
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-  }
-
-  .form-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .submit-btn {
-    padding: 0.75rem 2rem;
-    background: var(--accent);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
+  /* Drop zone */
+  .drop {
+    padding: 22px;
+    background: var(--bg-1);
+    border: 1px dashed var(--border);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
     cursor: pointer;
-    font-family: var(--font-family);
+  }
+  .drop:hover,
+  .drop.over {
+    border-color: var(--amber);
+    color: var(--amber);
   }
 
-  .submit-btn:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
-
-  .submit-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .cancel-link {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-
-  .photo-upload {
+  .previews {
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .photo-previews {
-    display: flex;
-    gap: 0.5rem;
     flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
   }
-
-  .photo-preview {
+  .preview {
     position: relative;
-    width: 100px;
-    height: 75px;
+    width: 96px;
+    height: 72px;
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
   }
-
-  .photo-preview img {
+  .preview img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid var(--border);
   }
-
-  .remove-photo {
+  .x {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    background: var(--danger);
-    color: white;
-    border: none;
-    border-radius: 50%;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    line-height: 16px;
+    font-size: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+  }
+  .x:hover { background: var(--red); color: var(--bg); border-color: var(--red); }
+
+  /* Foot */
+  .err {
+    font-family: var(--mono);
     font-size: 12px;
-    cursor: pointer;
+    color: var(--red);
+    margin-bottom: 12px;
+  }
+  .foot {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    line-height: 1;
+    gap: 16px;
+    flex-wrap: wrap;
   }
-
-  .add-photo-btn {
-    padding: 0.75rem 1rem;
-    background: none;
-    border: 2px dashed var(--border);
-    border-radius: 8px;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    cursor: pointer;
-    font-family: var(--font-family);
-    transition: border-color 0.15s, color 0.15s;
+  .hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    flex: 1;
+    min-width: 240px;
   }
-
-  .add-photo-btn:hover {
-    border-color: var(--accent);
-    color: var(--text);
+  .actions {
+    display: flex;
+    gap: 10px;
+  }
+  .cancel {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 14px;
   }
 </style>
