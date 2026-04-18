@@ -7,11 +7,18 @@
     <title>Is It Real? — Crowd-sourced listing reviews</title>
     <meta name="description" content="Real reviews from real visitors. Check an address before you tour it." />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
+
     <script>
       (function () {
         try {
           var stored = localStorage.getItem('theme');
-          var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          var theme = stored || 'dark';
           document.documentElement.setAttribute('data-theme', theme);
         } catch (e) {}
       })();

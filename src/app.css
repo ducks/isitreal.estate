@@ -1,0 +1,231 @@
+/* ========================================
+   isitreal.estate — design system
+   Tokens, reset, and element defaults.
+   ======================================== */
+
+:root {
+  /* Font stacks */
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+
+  /* Shape */
+  --radius: 0;
+  --border-width: 1px;
+
+  /* Layout */
+  --content-max: 1120px;
+  --content-pad-x: 20px;
+  --content-pad-y: 28px;
+}
+
+/* ---- Dark theme (spec: gruvbox-adjacent) ---- */
+:root[data-theme="dark"] {
+  --bg: #1d2021;
+  --bg-1: #282828;
+  --bg-2: #32302f;
+  --bg-3: #3c3836;
+  --border: #504945;
+  --border-soft: #3c3836;
+  --fg: #ebdbb2;
+  --fg-dim: #d5c4a1;
+  --fg-mute: #a89984;
+  --fg-faint: #7c6f64;
+  --green: #b8bb26;
+  --green-dim: #98971a;
+  --amber: #fabd2f;
+  --amber-dim: #d79921;
+  --red: #fb4934;
+  --red-dim: #cc241d;
+  --blue: #83a598;
+  --purple: #d3869b;
+  --orange: #fe8019;
+
+  color-scheme: dark;
+}
+
+/* ---- Light theme (inverted pairing of the same hues) ---- */
+:root[data-theme="light"] {
+  --bg: #fbf1c7;
+  --bg-1: #f2e5bc;
+  --bg-2: #ebdbb2;
+  --bg-3: #d5c4a1;
+  --border: #bdae93;
+  --border-soft: #d5c4a1;
+  --fg: #282828;
+  --fg-dim: #3c3836;
+  --fg-mute: #504945;
+  --fg-faint: #7c6f64;
+  --green: #79740e;
+  --green-dim: #98971a;
+  --amber: #b57614;
+  --amber-dim: #d79921;
+  --red: #9d0006;
+  --red-dim: #cc241d;
+  --blue: #076678;
+  --purple: #8f3f71;
+  --orange: #af3a03;
+
+  color-scheme: light;
+}
+
+/* Default to dark when the user has no preference set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1d2021;
+    --bg-1: #282828;
+    --bg-2: #32302f;
+    --bg-3: #3c3836;
+    --border: #504945;
+    --border-soft: #3c3836;
+    --fg: #ebdbb2;
+    --fg-dim: #d5c4a1;
+    --fg-mute: #a89984;
+    --fg-faint: #7c6f64;
+    --green: #b8bb26;
+    --green-dim: #98971a;
+    --amber: #fabd2f;
+    --amber-dim: #d79921;
+    --red: #fb4934;
+    --red-dim: #cc241d;
+    --blue: #83a598;
+    --purple: #d3869b;
+    --orange: #fe8019;
+    color-scheme: dark;
+  }
+}
+
+/* ---- Reset / base ---- */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0 0 1em 0;
+}
+
+a {
+  color: var(--blue);
+  text-decoration: none;
+  transition: color 120ms ease;
+}
+a:hover {
+  color: var(--amber);
+}
+
+button {
+  font-family: var(--sans);
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: var(--border-width) solid var(--border);
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+button:hover {
+  background: var(--bg-2);
+}
+button:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+input, textarea, select {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: var(--border-width) solid var(--border);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ---- Reusable utilities ---- */
+
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--content-pad-x);
+}
+
+/* Section label: mono 11px uppercase, letter-spaced, with bottom border. */
+.section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+/* Mono meta text (usernames, stats, timestamps). */
+.meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-mute);
+}
+
+/* Primary amber button */
+.btn-primary {
+  background: var(--amber);
+  color: var(--bg);
+  border-color: var(--amber);
+  font-weight: 500;
+}
+.btn-primary:hover {
+  background: var(--amber-dim);
+  border-color: var(--amber-dim);
+}
+.btn-primary:disabled {
+  background: var(--bg-2);
+  border-color: var(--border);
+  color: var(--fg-faint);
+  cursor: not-allowed;
+}
+
+/* Ghost button (used for Cancel and similar) */
+.btn-ghost {
+  background: transparent;
+  color: var(--fg-mute);
+}
+.btn-ghost:hover {
+  background: var(--bg-2);
+  color: var(--fg);
+}
