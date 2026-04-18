@@ -346,6 +346,64 @@
     .home-grid {
       grid-template-columns: 1fr;
     }
+    .map-box {
+      height: 340px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .main {
+      padding: 20px 16px 60px;
+    }
+    .hero-title {
+      font-size: 30px;
+      letter-spacing: -0.01em;
+    }
+    .hero-sub {
+      font-size: 12px;
+    }
+    .search-input {
+      font-size: 17px;
+      padding: 12px 14px 12px 36px;
+    }
+    .search-icon {
+      left: 12px;
+      font-size: 16px;
+    }
+    .map-box {
+      height: 260px;
+    }
+    .map-legend {
+      font-size: 9px;
+      padding: 4px 6px;
+    }
+    .feed-item {
+      grid-template-columns: 56px 1fr;
+      gap: 10px;
+      padding: 12px 0;
+    }
+    .thumb {
+      width: 56px;
+      height: 56px;
+    }
+    .feed-addr {
+      font-size: 14px;
+    }
+    .feed-body {
+      font-size: 12px;
+    }
+    .ticker {
+      padding: 16px 0;
+      gap: 12px;
+      font-size: 10px;
+    }
+    .ticker strong {
+      font-size: 16px;
+    }
+    .ticker > div {
+      flex: 1 1 40%;
+      text-align: center;
+    }
   }
 
   /* ---- Map box ---- */

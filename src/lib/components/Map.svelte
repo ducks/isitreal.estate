@@ -105,8 +105,21 @@
     z-index: 0;
   }
 
+  /* Leaflet wraps divIcons in .leaflet-div-icon with its own bg/border — strip it */
+  :global(.leaflet-div-icon) {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 14px !important;
+    height: 14px !important;
+  }
+
   /* Custom pin shape + colors */
   :global(.ire-pin) {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 14px;
     height: 14px;
     border: 2px solid var(--bg);

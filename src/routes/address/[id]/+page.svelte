@@ -462,6 +462,47 @@
     .statbar :global(.pill:nth-child(2n)) { border-right: none; }
   }
 
+  @media (max-width: 560px) {
+    .main {
+      padding: 20px 16px 60px;
+    }
+    .header h1 {
+      font-size: 28px;
+    }
+    .header {
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .statbar :global(.pill) {
+      padding: 12px 10px;
+    }
+    .statbar :global(.pill .value) {
+      font-size: 22px;
+    }
+    .statbar :global(.pill .label) {
+      font-size: 10px;
+    }
+    .tile {
+      width: 200px;
+      height: 150px;
+    }
+    .actions-row {
+      gap: 10px;
+    }
+    .actions-right {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .sort button {
+      padding: 5px 8px;
+      font-size: 10px;
+    }
+    .cta {
+      font-size: 11px;
+      padding: 6px 10px;
+    }
+  }
+
   /* Evidence strip */
   .evidence { margin-bottom: 28px; }
   .strip {

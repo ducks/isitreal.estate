@@ -262,4 +262,46 @@
   .posted {
     color: var(--fg-faint);
   }
+
+  @media (max-width: 560px) {
+    .card {
+      padding: 16px 0;
+    }
+    .head {
+      gap: 8px;
+      font-size: 10px;
+    }
+    .author {
+      font-size: 12px;
+    }
+    .visited {
+      margin-left: 0;
+      width: 100%;
+      order: 10;
+      color: var(--fg-faint);
+    }
+    .body {
+      font-size: 13px;
+    }
+    .photos {
+      gap: 4px;
+    }
+    .photo {
+      width: 72px;
+      height: 56px;
+    }
+    .foot {
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 11px;
+    }
+    .vote {
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+    .posted {
+      width: 100%;
+      order: 10;
+    }
+  }
 </style>

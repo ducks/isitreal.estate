@@ -485,4 +485,52 @@
     align-items: center;
     padding: 8px 14px;
   }
+
+  @media (max-width: 560px) {
+    .wrap {
+      padding: 20px 12px;
+    }
+    .card {
+      padding: 20px 16px;
+    }
+    .card h1 {
+      font-size: 20px;
+    }
+    .sub {
+      font-size: 11px;
+      margin-bottom: 20px;
+    }
+    .seg-btn {
+      font-size: 11px;
+      padding: 9px 6px;
+      letter-spacing: 0.04em;
+    }
+    .star {
+      font-size: 24px;
+      padding: 0 2px;
+    }
+    .rating {
+      gap: 10px;
+    }
+    .drop {
+      padding: 18px 12px;
+      font-size: 11px;
+    }
+    .preview {
+      width: 80px;
+      height: 60px;
+    }
+    .foot {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .hint {
+      min-width: 0;
+      text-align: left;
+    }
+    .actions {
+      justify-content: flex-end;
+    }
+  }
 </style>
