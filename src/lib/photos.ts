@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
-const UPLOAD_DIR = 'uploads';
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
 const MAX_WIDTH = 1600;
 const MAX_HEIGHT = 1200;
 const QUALITY = 80;
