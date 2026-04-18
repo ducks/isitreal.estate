@@ -1,9 +1,10 @@
 import type { RequestHandler } from './$types';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { UPLOAD_DIR } from '$lib/photos';
 
 export const GET: RequestHandler = async ({ params }) => {
-  const filepath = join('uploads', params.path);
+  const filepath = join(UPLOAD_DIR, params.path);
 
   try {
     const data = await readFile(filepath);
