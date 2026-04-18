@@ -27,14 +27,42 @@ export const load: PageServerLoad = async ({ params }) => {
     [user.id]
   );
 
+  const reviewIds = reviewsResult.rows.map(r => r.id);
+  let photos: any[] = [];
+  if (reviewIds.length > 0) {
+    const photosResult = await query(
+      `SELECT * FROM review_photos WHERE review_id = ANY($1)`,
+      [reviewIds]
+    );
+    photos = photosResult.rows;
+  }
+
   // Credibility: % of their reviews voted accurate
-  const totalVotes = reviewsResult.rows.reduce((s, r) => s + r.accurate_count + r.not_accurate_count, 0);
+  const totalVotes = reviewsResult.rows.reduce(
+    (s, r) => s + r.accurate_count + r.not_accurate_count,
+    0
+  );
   const accurateVotes = reviewsResult.rows.reduce((s, r) => s + r.accurate_count, 0);
   const credibility = totalVotes > 0 ? Math.round((accurateVotes / totalVotes) * 100) : null;
 
+  // Verdict counts
+  const calledAccurate = reviewsResult.rows.filter(r => r.listing_accurate === 'yes').length;
+  const calledPartial = reviewsResult.rows.filter(r => r.listing_accurate === 'partially').length;
+  const calledMisleading = reviewsResult.rows.filter(r => r.listing_accurate === 'no').length;
+
   return {
     profile: user,
-    reviews: reviewsResult.rows,
-    credibility
+    reviews: reviewsResult.rows.map(r => ({
+      ...r,
+      photos: photos.filter(p => p.review_id === r.id)
+    })),
+    credibility,
+    stats: {
+      reviewCount: reviewsResult.rows.length,
+      photoCount: photos.length,
+      calledAccurate,
+      calledPartial,
+      calledMisleading
+    }
   };
 };
