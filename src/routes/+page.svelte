@@ -2,22 +2,26 @@
   import type { PageData } from './$types';
   import { goto } from '$app/navigation';
   import Map from '$lib/components/Map.svelte';
+  import Stars from '$lib/components/Stars.svelte';
+  import AccuracyBadge from '$lib/components/AccuracyBadge.svelte';
 
   let { data }: { data: PageData } = $props();
 
   let searchQuery = $state('');
   let suggestions = $state<any[]>([]);
-  let searching = $state(false);
+  let focused = $state(false);
+  let selIdx = $state(0);
   let debounceTimer: ReturnType<typeof setTimeout>;
+  let searchBoxRef: HTMLDivElement;
 
   function handleInput() {
     clearTimeout(debounceTimer);
+    selIdx = 0;
     if (searchQuery.trim().length < 3) {
       suggestions = [];
       return;
     }
     debounceTimer = setTimeout(async () => {
-      searching = true;
       try {
         const res = await fetch(`/api/geocode?q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
@@ -25,8 +29,6 @@
         }
       } catch {
         // ignore
-      } finally {
-        searching = false;
       }
     }, 300);
   }
@@ -44,313 +46,466 @@
         lng: parseFloat(suggestion.lon || suggestion.lng)
       })
     });
-
     if (res.ok) {
       const address = await res.json();
       goto(`/address/${address.id}`);
     }
   }
 
-  const mapMarkers = $derived(
-    data.mapAddresses.map((a: any) => ({
-      lat: a.lat,
-      lng: a.lng,
-      id: a.id,
-      label: `${a.street}, ${a.city}${a.state ? `, ${a.state}` : ''}`,
-      reviewCount: a.review_count
-    }))
-  );
-
-  function accuracyLabel(val: string) {
-    if (val === 'yes') return 'Accurate';
-    if (val === 'partially') return 'Partially';
-    return 'Inaccurate';
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selIdx = Math.min(selIdx + 1, suggestions.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selIdx = Math.max(selIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (suggestions[selIdx]) selectAddress(suggestions[selIdx]);
+    } else if (e.key === 'Escape') {
+      focused = false;
+    }
   }
 
-  function accuracyColor(val: string) {
-    if (val === 'yes') return 'var(--success)';
-    if (val === 'partially') return 'var(--warning)';
-    return 'var(--danger)';
+  function onBlur(e: FocusEvent) {
+    if (!searchBoxRef?.contains(e.relatedTarget as Node)) focused = false;
+  }
+
+  const mapMarkers = $derived(
+    data.mapAddresses.map((a: any) => {
+      const yes = a.yes_count ?? 0;
+      const no = a.no_count ?? 0;
+      const mood = yes > no ? 'yes' : no > yes ? 'no' : 'partial';
+      return {
+        lat: a.lat,
+        lng: a.lng,
+        id: a.id,
+        label: `${a.street}, ${a.city}${a.state ? `, ${a.state}` : ''}`,
+        reviewCount: a.review_count,
+        mood
+      };
+    })
+  );
+
+  function addressLine(s: any) {
+    return s.street || s.display_name;
+  }
+
+  function bodyPreview(body: string | null): string {
+    if (!body) return '';
+    return body.length > 140 ? body.slice(0, 140) + '…' : body;
+  }
+
+  function verdictForReview(v: string): 'yes' | 'partial' | 'no' {
+    if (v === 'yes') return 'yes';
+    if (v === 'no') return 'no';
+    return 'partial';
+  }
+
+  function relativeTime(d: string): string {
+    const then = new Date(d).getTime();
+    const now = Date.now();
+    const s = Math.max(1, Math.floor((now - then) / 1000));
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    if (days < 7) return `${days}d ago`;
+    const w = Math.floor(days / 7);
+    if (w < 5) return `${w}w ago`;
+    const mo = Math.floor(days / 30);
+    if (mo < 12) return `${mo}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
   }
 </script>
 
-<main>
-  <div class="hero">
-    <h1>Real reviews from real visitors.</h1>
-    <p class="subtitle">Search any address to see what people actually found when they visited.</p>
+<div class="main">
+  <section class="hero">
+    <h1 class="hero-title">Know what you're walking into.</h1>
+    <div class="hero-sub">
+      a crowd-sourced ledger of what real estate listings actually deliver —
+      left by the people who showed up.
+    </div>
 
-    <div class="search-container">
+    <div class="search-wrap" bind:this={searchBoxRef} onfocusout={onBlur}>
+      <span class="search-icon" aria-hidden="true">⌕</span>
       <input
-        type="text"
         class="search-input"
-        placeholder="Search an address..."
+        type="text"
+        placeholder="Search an address before you visit."
         bind:value={searchQuery}
         oninput={handleInput}
+        onfocus={() => (focused = true)}
+        onkeydown={onKeyDown}
       />
-      {#if suggestions.length > 0}
-        <div class="suggestions">
-          {#each suggestions as s}
-            <button class="suggestion" onclick={() => selectAddress(s)}>
-              {s.display_name}
+      {#if focused && suggestions.length > 0}
+        <div class="autocomplete">
+          {#each suggestions as s, i (s.place_id ?? i)}
+            <button
+              type="button"
+              class="row"
+              class:sel={i === selIdx}
+              onmouseenter={() => (selIdx = i)}
+              onmousedown={(e) => {
+                e.preventDefault();
+                selectAddress(s);
+              }}
+            >
+              <span class="addr">{addressLine(s)}</span>
+              <span class="row-meta">
+                {#if s.city || s.state}{s.city}{s.state ? `, ${s.state}` : ''}{/if}
+              </span>
             </button>
           {/each}
         </div>
       {/if}
     </div>
+  </section>
+
+  <div class="home-grid">
+    <div>
+      <div class="section-label">Nearby reviewed addresses</div>
+      <div class="map-box">
+        {#if mapMarkers.length > 0}
+          <Map markers={mapMarkers} />
+        {:else}
+          <div class="map-empty">no reviewed addresses yet</div>
+        {/if}
+        <div class="map-legend">
+          <span class="key"><span class="sw green"></span>mostly accurate</span>
+          <span class="key"><span class="sw amber"></span>mixed</span>
+          <span class="key"><span class="sw red"></span>mostly misleading</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="feed">
+      <div class="section-label">Recent reviews</div>
+      <div class="feed">
+        {#if data.recentReviews.length === 0}
+          <div class="feed-empty">no reviews yet. be the first.</div>
+        {:else}
+          {#each data.recentReviews as r}
+            <a class="feed-item" href="/address/{r.address_id}">
+              <div class="thumb" class:empty={!r.first_photo}>
+                {#if r.first_photo}
+                  <img src="/uploads/{r.first_photo}" alt="" />
+                {:else}
+                  <span>no photo</span>
+                {/if}
+              </div>
+              <div class="feed-body-wrap">
+                <div class="feed-addr">{r.street}</div>
+                <div class="feed-meta">
+                  <span class="author">@{r.username}</span>
+                  <Stars n={r.rating} />
+                  <AccuracyBadge value={verdictForReview(r.listing_accurate)} />
+                  <span class="posted">· {relativeTime(r.created_at)}</span>
+                </div>
+                {#if r.body}
+                  <div class="feed-body">{bodyPreview(r.body)}</div>
+                {/if}
+              </div>
+            </a>
+          {/each}
+        {/if}
+      </div>
+    </div>
   </div>
 
-  {#if mapMarkers.length > 0}
-    <section class="map-section">
-      <h2>Reviewed Addresses</h2>
-      <div class="map-wrapper">
-        <Map markers={mapMarkers} />
-      </div>
-    </section>
-  {/if}
-
-  <section class="recent">
-    <h2>Recent Reviews</h2>
-    {#if data.recentReviews.length === 0}
-      <p class="empty">No reviews yet. Be the first to review an address.</p>
-    {:else}
-      <div class="reviews-feed">
-        {#each data.recentReviews as review}
-          <a href="/address/{review.address_id}" class="feed-card">
-            <div class="feed-header">
-              <span class="feed-address">{review.street}, {review.city}{review.state ? `, ${review.state}` : ''}</span>
-              <span class="feed-rating">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
-            </div>
-            <div class="feed-meta">
-              <span class="feed-accuracy" style="color: {accuracyColor(review.listing_accurate)}">
-                {accuracyLabel(review.listing_accurate)}
-              </span>
-              <span class="feed-author">by {review.username}</span>
-              <span class="feed-date">{new Date(review.created_at).toLocaleDateString()}</span>
-            </div>
-            {#if review.body}
-              <p class="feed-body">{review.body.slice(0, 150)}{review.body.length > 150 ? '...' : ''}</p>
-            {/if}
-          </a>
-        {/each}
-      </div>
-    {/if}
-  </section>
-</main>
+  <div class="ticker">
+    <div><strong>{data.stats.addresses_reviewed.toLocaleString()}</strong> addresses reviewed</div>
+    <div><strong>{data.stats.total_reviews.toLocaleString()}</strong> reviews</div>
+    <div><strong>{data.stats.total_photos.toLocaleString()}</strong> photos of evidence</div>
+    <div><strong>{data.stats.contributors.toLocaleString()}</strong> contributors</div>
+  </div>
+</div>
 
 <style>
-  main {
-    max-width: 1100px;
+  .main {
+    max-width: var(--content-max);
     margin: 0 auto;
-    padding: 0 1.5rem;
+    padding: var(--content-pad-y) var(--content-pad-x) 80px;
   }
 
+  /* ---- Hero ---- */
   .hero {
-    text-align: center;
-    padding: 4rem 0 3rem;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 28px;
+  }
+  .hero-title {
+    font-family: var(--serif);
+    font-size: 44px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+    max-width: 20ch;
+    margin: 0 0 12px 0;
+  }
+  .hero-sub {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg-mute);
+    max-width: 60ch;
+    margin-bottom: 22px;
+    line-height: 1.6;
   }
 
-  h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0 0.75rem;
-  }
-
-  .subtitle {
-    font-size: 1.1rem;
-    color: var(--text-muted);
-    margin: 0 0 2rem;
-  }
-
-  .search-container {
+  /* ---- Search ---- */
+  .search-wrap {
     position: relative;
-    max-width: 600px;
-    margin: 0 auto;
+    max-width: 820px;
   }
-
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    color: var(--fg-faint);
+    pointer-events: none;
+    font-size: 18px;
+  }
   .search-input {
     width: 100%;
-    padding: 1rem 1.25rem;
-    font-size: 1.1rem;
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg-raised);
-    color: var(--text);
-    font-family: var(--font-family);
-    outline: none;
-    transition: border-color 0.15s;
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 14px 16px 14px 40px;
+    line-height: 1.2;
   }
-
   .search-input:focus {
-    border-color: var(--accent);
+    outline: none;
+    border-color: var(--amber);
   }
-
   .search-input::placeholder {
-    color: var(--text-muted);
+    color: var(--fg-faint);
   }
 
-  .suggestions {
+  .autocomplete {
     position: absolute;
-    top: 100%;
     left: 0;
     right: 0;
-    background: var(--bg-raised);
+    top: 100%;
+    background: var(--bg-1);
     border: 1px solid var(--border);
     border-top: none;
-    border-radius: 0 0 12px 12px;
-    max-height: 300px;
+    z-index: 20;
+    max-height: 320px;
     overflow-y: auto;
-    z-index: 10;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   }
-
-  .suggestion {
-    display: block;
+  .row {
     width: 100%;
-    padding: 0.75rem 1.25rem;
-    text-align: left;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--border-subtle);
-    color: var(--text);
-    font-size: 0.95rem;
-    cursor: pointer;
-    font-family: var(--font-family);
-  }
-
-  .suggestion:hover {
-    background: var(--bg-sunken);
-  }
-
-  .suggestion:last-child {
-    border-bottom: none;
-  }
-
-  .map-section {
-    margin-bottom: 2rem;
-  }
-
-  .map-section h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 1rem;
-  }
-
-  .map-wrapper {
-    height: 400px;
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .recent {
-    padding: 2rem 0;
-  }
-
-  .recent h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0 1rem;
-  }
-
-  .empty {
-    color: var(--text-muted);
-    text-align: center;
-    padding: 3rem 0;
-  }
-
-  .reviews-feed {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .feed-card {
-    display: block;
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    text-decoration: none;
-    color: inherit;
-    transition: border-color 0.15s;
-  }
-
-  .feed-card:hover {
-    border-color: var(--accent);
-    text-decoration: none;
-  }
-
-  .feed-header {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
+    gap: 14px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-soft);
+    text-align: left;
+    cursor: pointer;
+  }
+  .row:last-child { border-bottom: none; }
+  .row.sel,
+  .row:hover {
+    background: var(--bg-2);
+  }
+  .addr {
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--fg);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    white-space: nowrap;
+  }
+
+  /* ---- Two-col grid ---- */
+  .home-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 28px;
+    margin-top: 28px;
+  }
+  @media (max-width: 880px) {
+    .home-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ---- Map box ---- */
+  .map-box {
+    position: relative;
+    height: 460px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+  }
+  :global(.map-box .leaflet-container) {
+    height: 100%;
+  }
+  :global(.map-box .leaflet-tile) {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.95) saturate(0.6);
+  }
+  :global(:root[data-theme="light"] .map-box .leaflet-tile) {
+    filter: none;
+  }
+  .map-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
     align-items: center;
-    margin-bottom: 0.25rem;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+  }
+  .map-legend {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .key {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sw {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+  }
+  .sw.green { background: var(--green); }
+  .sw.amber { background: var(--amber); }
+  .sw.red { background: var(--red); }
+
+  /* ---- Feed ---- */
+  .feed-empty {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+    padding: 20px 0;
+  }
+  .feed {
+    display: flex;
+    flex-direction: column;
+  }
+  .feed-item {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border-soft);
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .feed-item:first-child { border-top: none; padding-top: 0; }
+  .feed-item:hover { background: transparent; color: var(--fg); }
+  .feed-item:hover .feed-addr { color: var(--amber); }
+
+  .thumb {
+    width: 70px;
+    height: 70px;
+    overflow: hidden;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
-  .feed-address {
-    font-weight: 600;
-    color: var(--text);
+  .feed-body-wrap {
+    min-width: 0;
   }
-
-  .feed-rating {
-    color: var(--warning);
-    font-size: 0.95rem;
+  .feed-addr {
+    font-family: var(--serif);
+    font-size: 15px;
+    color: var(--fg);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 120ms ease;
   }
-
   .feed-meta {
     display: flex;
-    gap: 0.75rem;
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    margin-bottom: 4px;
   }
-
-  .feed-accuracy {
-    font-weight: 600;
-  }
-
-  .feed-author, .feed-date {
-    color: var(--text-muted);
-  }
-
+  .feed-meta .author { color: var(--fg-mute); }
+  .feed-meta .posted { color: var(--fg-faint); }
   .feed-body {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin: 0;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--fg-dim);
     line-height: 1.5;
   }
 
-  @media (max-width: 640px) {
-    .hero {
-      padding: 2rem 0 1.5rem;
-    }
-
-    h1 {
-      font-size: 1.75rem;
-    }
-
-    .subtitle {
-      font-size: 0.95rem;
-    }
-
-    .search-input {
-      font-size: 1rem;
-      padding: 0.75rem 1rem;
-    }
-
-    .map-wrapper {
-      height: 280px;
-    }
-
-    .feed-header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-    }
-
-    .feed-meta {
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
+  /* ---- Stats ticker ---- */
+  .ticker {
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .ticker strong {
+    display: block;
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--fg);
+    text-transform: none;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
   }
 </style>
