@@ -122,4 +122,20 @@
     color: var(--fg);
     font-style: italic;
   }
+
+  @media (max-width: 560px) {
+    .main {
+      padding: 20px 16px 60px;
+    }
+    h1 {
+      font-size: 26px;
+    }
+    .body {
+      font-size: 14px;
+    }
+    .list {
+      font-size: 14px;
+      padding-left: 18px;
+    }
+  }
 </style>

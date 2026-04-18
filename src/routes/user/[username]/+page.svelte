@@ -114,9 +114,38 @@
     margin-bottom: 28px;
   }
   @media (max-width: 560px) {
+    .main {
+      padding: 20px 16px 60px;
+    }
     .header {
       grid-template-columns: 1fr;
       align-items: start;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: 28px;
+    }
+    .sub {
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .cred-tile {
+      padding: 12px 16px;
+      min-width: auto;
+      align-self: flex-start;
+    }
+    .cred-value {
+      font-size: 28px;
+    }
+    .stats-row {
+      gap: 16px;
+      font-size: 11px;
+      padding: 12px 0;
+      margin-bottom: 20px;
+    }
+    .val {
+      font-size: 16px;
     }
   }
 

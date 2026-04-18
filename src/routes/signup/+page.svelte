@@ -164,4 +164,16 @@
   .foot a {
     color: var(--amber);
   }
+
+  @media (max-width: 420px) {
+    .wrap {
+      padding: 20px 12px;
+    }
+    .card {
+      padding: 24px 20px;
+    }
+    .card h1 {
+      font-size: 20px;
+    }
+  }
 </style>
