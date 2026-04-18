@@ -1,158 +1,167 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
 
   let username = $state('');
   let email = $state('');
   let password = $state('');
-  let error = $state('');
+  let errorMsg = $state('');
   let loading = $state(false);
+
+  const returnTo = $derived($page.url.searchParams.get('returnTo') ?? '/');
 
   async function submit() {
     loading = true;
-    error = '';
-
+    errorMsg = '';
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
       });
-
       if (!res.ok) {
         const data = await res.json();
-        error = data.error || 'Signup failed';
+        errorMsg = data.error || 'signup failed';
         return;
       }
-
-      goto('/');
+      goto(returnTo);
     } catch {
-      error = 'Network error';
+      errorMsg = 'network error';
     } finally {
       loading = false;
     }
   }
 </script>
 
-<main>
-  <div class="auth-card">
-    <h1>Sign up</h1>
+<svelte:head>
+  <title>Sign up — isitreal.estate</title>
+</svelte:head>
+
+<div class="wrap">
+  <div class="card">
+    <h1>Make an account.</h1>
+    <p class="sub">a username, an email, a password. that's it. no social, no tracking.</p>
 
     <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input id="username" type="text" bind:value={username} required />
-      </div>
+      <label class="lbl" for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" bind:value={username} required />
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input id="email" type="email" bind:value={email} required />
-      </div>
+      <label class="lbl" for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" bind:value={email} required />
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input id="password" type="password" bind:value={password} required minlength="8" />
-      </div>
+      <label class="lbl" for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        autocomplete="new-password"
+        bind:value={password}
+        required
+        minlength="8"
+      />
 
-      {#if error}
-        <div class="error">{error}</div>
+      {#if errorMsg}
+        <div class="err">{errorMsg}</div>
       {/if}
 
-      <button type="submit" disabled={loading}>
-        {loading ? 'Creating account...' : 'Sign up'}
+      <button
+        type="submit"
+        class="btn-primary full"
+        disabled={loading || !username || !email || !password}
+      >
+        {loading ? 'creating account…' : 'Create account →'}
       </button>
     </form>
 
-    <p class="alt">Already have an account? <a href="/login">Log in</a></p>
+    <div class="foot">
+      already have an account? <a href="/login">log in</a>
+    </div>
   </div>
-</main>
+</div>
 
 <style>
-  main {
+  .wrap {
+    min-height: 70vh;
     display: flex;
+    align-items: center;
     justify-content: center;
-    padding: 4rem 1.5rem;
+    padding: 40px 20px;
   }
 
-  .auth-card {
+  .card {
     width: 100%;
-    max-width: 400px;
-    background: var(--bg-raised);
+    max-width: 380px;
+    background: var(--bg-1);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 2rem;
+    padding: 32px;
   }
 
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 1.5rem;
-    text-align: center;
+  .card h1 {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px 0;
   }
 
-  .form-group {
-    margin-bottom: 1rem;
+  .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-bottom: 24px;
+    line-height: 1.5;
   }
 
-  label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 0.4rem;
+  form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--fg-mute);
+    margin-bottom: 6px;
   }
 
   input {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
     background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-family);
-    font-size: 1rem;
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    color: var(--fg);
   }
-
   input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: var(--amber);
   }
 
-  .error {
-    padding: 0.75rem;
-    background: var(--danger-bg);
-    color: var(--danger);
-    border: 1px solid var(--danger-border);
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
+  .err {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--red);
+    margin-bottom: 14px;
   }
 
-  button {
+  .btn-primary.full {
     width: 100%;
-    padding: 0.75rem;
-    background: var(--accent);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: var(--font-family);
+    padding: 12px;
+    font-weight: 500;
   }
 
-  button:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
-
-  button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .alt {
+  .foot {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
     text-align: center;
-    margin: 1.5rem 0 0;
-    font-size: 0.9rem;
-    color: var(--text-muted);
+  }
+  .foot a {
+    color: var(--amber);
   }
 </style>
