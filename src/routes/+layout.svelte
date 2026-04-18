@@ -1,19 +1,17 @@
 <script lang="ts">
+  import '../app.css';
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import type { LayoutData } from './$types';
 
   let { data, children }: { data: LayoutData; children: any } = $props();
 
-  let theme = $state<'light' | 'dark'>('light');
+  let theme = $state<'light' | 'dark'>('dark');
 
   onMount(() => {
     const stored = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (stored) {
-      theme = stored;
-    } else {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    theme = stored || 'dark';
     document.documentElement.setAttribute('data-theme', theme);
   });
 
@@ -27,300 +25,170 @@
     await fetch('/api/auth/logout', { method: 'POST' });
     goto('/login');
   }
+
+  const currentPath = $derived($page.url.pathname);
 </script>
 
-<header>
-  <div class="container">
-    <a href="/" class="brand">Is It Real?</a>
-    <nav>
-      {#if data.user}
-        <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
-        {#if data.user.is_admin}
-          <a href="/admin" class="nav-link">Admin</a>
-        {/if}
-        <a href="/user/{data.user.username}" class="nav-link">{data.user.username}</a>
-        <button class="nav-button" onclick={handleLogout}>Log out</button>
-      {:else}
-        <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
-        <a href="/login" class="nav-link">Log in</a>
-        <a href="/signup" class="nav-link cta">Sign up</a>
-      {/if}
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="brand">
+      isitreal<span class="brand-dot">.</span><span class="brand-tld">estate</span>
+    </a>
+
+    <nav class="nav">
+      <a href="/" class="nav-link" class:active={currentPath === '/'}>search</a>
+      <a href="/#feed" class="nav-link">recent</a>
+      <a href="/about" class="nav-link" class:active={currentPath === '/about'}>about</a>
     </nav>
+
+    <div class="right">
+      <button class="theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
+        {theme === 'dark' ? '☀' : '☾'}
+      </button>
+      {#if data.user}
+        {#if data.user.is_admin}
+          <a href="/admin" class="nav-link">admin</a>
+        {/if}
+        <a href="/user/{data.user.username}" class="nav-link">@{data.user.username}</a>
+        <span class="sep">·</span>
+        <button class="linklike" onclick={handleLogout}>log out</button>
+      {:else}
+        <a href="/login" class="nav-link">log in</a>
+        <span class="sep">·</span>
+        <a href="/signup" class="nav-link accent">sign up</a>
+      {/if}
+    </div>
   </div>
 </header>
 
-{@render children()}
+<main>
+  {@render children()}
+</main>
 
-<footer>
-  <div class="footer-container">
-    <span>isitreal.estate — crowd-sourced listing reviews</span>
-    <span class="footer-links">
-      <a href="/">Home</a>
-    </span>
-  </div>
+<footer class="footer">
+  a crowd-sourced real estate review ledger · v0.3 · no ads · no listings · no commission
 </footer>
 
 <style>
-  :global(:root) {
-    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-
-    --bg: #fafaf9;
-    --bg-raised: #ffffff;
-    --bg-sunken: #f0efed;
-    --bg-accent: #f5f0e8;
-
-    --border: #e2e0db;
-    --border-subtle: #ebebeb;
-
-    --text: #1a1a1a;
-    --text-muted: #6b6b6b;
-    --text-inverse: #ffffff;
-
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-
-    --danger: #dc2626;
-    --danger-hover: #b91c1c;
-    --danger-bg: #fef2f2;
-    --danger-border: #fecaca;
-
-    --success: #16a34a;
-    --success-bg: #f0fdf4;
-    --success-text: #166534;
-
-    --warning: #d97706;
-    --warning-bg: #fffbeb;
-
-    --neutral-bg: #f3f4f6;
-    --neutral-text: #4b5563;
-
-    color-scheme: light;
-  }
-
-  :global(:root[data-theme="dark"]) {
-    --bg: #0f0f0f;
-    --bg-raised: #1a1a1a;
-    --bg-sunken: #0a0a0a;
-    --bg-accent: #1f1b14;
-
-    --border: #2a2a2a;
-    --border-subtle: #222222;
-
-    --text: #e5e5e5;
-    --text-muted: #8b8b8b;
-    --text-inverse: #0f0f0f;
-
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-
-    --danger: #f87171;
-    --danger-hover: #fca5a5;
-    --danger-bg: #1c1111;
-    --danger-border: #3b1515;
-
-    --success: #4ade80;
-    --success-bg: #0f1f15;
-    --success-text: #86efac;
-
-    --warning: #fbbf24;
-    --warning-bg: #1f1a0f;
-
-    --neutral-bg: #1f1f1f;
-    --neutral-text: #a1a1a1;
-
-    color-scheme: dark;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme="light"])) {
-      --bg: #0f0f0f;
-      --bg-raised: #1a1a1a;
-      --bg-sunken: #0a0a0a;
-      --bg-accent: #1f1b14;
-      --border: #2a2a2a;
-      --border-subtle: #222222;
-      --text: #e5e5e5;
-      --text-muted: #8b8b8b;
-      --text-inverse: #0f0f0f;
-      --accent: #3b82f6;
-      --accent-hover: #60a5fa;
-      --danger: #f87171;
-      --danger-hover: #fca5a5;
-      --danger-bg: #1c1111;
-      --danger-border: #3b1515;
-      --success: #4ade80;
-      --success-bg: #0f1f15;
-      --success-text: #86efac;
-      --warning: #fbbf24;
-      --warning-bg: #1f1a0f;
-      --neutral-bg: #1f1f1f;
-      --neutral-text: #a1a1a1;
-      color-scheme: dark;
-    }
-  }
-
-  :global(body) {
-    margin: 0;
-    padding: 0;
-    font-family: var(--font-family);
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
     background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
+    border-bottom: 1px solid var(--border-soft);
   }
 
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(a) {
-    color: var(--accent);
-    text-decoration: none;
-  }
-
-  :global(a:hover) {
-    text-decoration: underline;
-  }
-
-  header {
-    background: var(--bg-raised);
-    border-bottom: 1px solid var(--border);
-    padding: 0.75rem 0;
-  }
-
-  .container {
-    max-width: 1100px;
+  .topbar-inner {
+    max-width: var(--content-max);
     margin: 0 auto;
-    padding: 0 1.5rem;
+    padding: 10px var(--content-pad-x);
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 20px;
   }
 
   .brand {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
-    text-decoration: none;
+    font-family: var(--serif);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: -0.005em;
+  }
+  .brand:hover { color: var(--fg); }
+  .brand-dot { color: var(--orange); }
+  .brand-tld {
+    color: var(--fg-mute);
+    font-weight: 400;
   }
 
-  .brand:hover {
-    text-decoration: none;
-    opacity: 0.8;
-  }
-
-  nav {
+  .nav {
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    gap: 18px;
+    margin-left: 8px;
   }
 
   .nav-link {
-    font-size: 0.9rem;
-    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    letter-spacing: 0.02em;
+  }
+  .nav-link:hover,
+  .nav-link.active {
+    color: var(--amber);
+  }
+  .nav-link.accent {
+    color: var(--amber);
+  }
+  .nav-link.accent:hover {
+    color: var(--amber-dim);
   }
 
-  .nav-link:hover {
-    color: var(--text);
-    text-decoration: none;
+  .right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
   }
 
-  .nav-link.cta {
-    background: var(--accent);
-    color: var(--text-inverse);
-    padding: 0.4rem 1rem;
-    border-radius: 6px;
-    font-weight: 600;
+  .sep {
+    color: var(--fg-faint);
   }
 
-  .nav-link.cta:hover {
-    background: var(--accent-hover);
-  }
-
-  .nav-button {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 0.4rem 1rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
+  .linklike {
+    border: none;
+    padding: 0;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
     cursor: pointer;
-    font-family: var(--font-family);
   }
-
-  .nav-button:hover {
-    background: var(--bg-sunken);
-    color: var(--text);
+  .linklike:hover {
+    background: transparent;
+    color: var(--amber);
   }
 
   .theme-toggle {
-    background: transparent;
     border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.4rem 0.6rem;
-    border-radius: 6px;
-    font-size: 1rem;
+    background: transparent;
+    color: var(--fg-mute);
+    padding: 3px 8px;
+    font-size: 12px;
     line-height: 1;
-    cursor: pointer;
   }
-
   .theme-toggle:hover {
-    background: var(--bg-sunken);
+    background: var(--bg-2);
+    color: var(--fg);
   }
 
-  footer {
-    margin-top: 4rem;
-    padding: 1.5rem 0;
-    border-top: 1px solid var(--border);
+  main {
+    min-height: calc(100vh - 120px);
   }
 
-  .footer-container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.85rem;
-    color: var(--text-muted);
+  .footer {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    text-align: center;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-soft);
+    margin-top: 60px;
   }
 
-  .footer-links {
-    display: flex;
-    gap: 1rem;
-  }
-
-  .footer-links a {
-    color: var(--text-muted);
-  }
-
-  .footer-links a:hover {
-    color: var(--text);
-  }
-
-  @media (max-width: 640px) {
-    .container {
-      padding: 0 1rem;
+  @media (max-width: 720px) {
+    .topbar-inner {
+      flex-wrap: wrap;
+      gap: 12px;
     }
-
-    .brand {
-      font-size: 1.1rem;
-    }
-
-    nav {
-      gap: 0.5rem;
-    }
-
-    .nav-link, .nav-button {
-      font-size: 0.8rem;
-      padding: 0.3rem 0.6rem;
-    }
-
-    .nav-link.cta {
-      padding: 0.3rem 0.6rem;
+    .nav { gap: 14px; }
+    .right {
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-end;
     }
   }
 </style>
