@@ -1,38 +1,50 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import Map from '$lib/components/Map.svelte';
+  import ReviewCard from '$lib/components/ReviewCard.svelte';
+  import StatPill from '$lib/components/StatPill.svelte';
+  import Lightbox from '$lib/components/Lightbox.svelte';
 
   let { data }: { data: PageData } = $props();
 
-  function accuracyColor(val: string) {
-    if (val === 'yes') return 'var(--success)';
-    if (val === 'partially') return 'var(--warning)';
-    return 'var(--danger)';
-  }
+  let sortMode = $state<'helpful' | 'newest'>('helpful');
+  let shareText = $state('share');
 
-  function accuracyLabel(val: string) {
-    if (val === 'yes') return 'Accurate';
-    if (val === 'partially') return 'Partially';
-    return 'Inaccurate';
-  }
+  // Reporting
+  let reportingReviewId = $state<string | null>(null);
+  let reportReason = $state('');
 
-  let shareText = $state('Share');
+  // Listings
   let showAddListing = $state(false);
   let listingUrl = $state('');
   let listingPrice = $state('');
   let listingError = $state('');
 
-  async function vote(reviewId: string, voteType: 'accurate' | 'not_accurate') {
+  // Lightbox
+  let lightboxOpen = $state(false);
+  let lightboxIndex = $state(0);
+
+  const allPhotos = $derived(data.allPhotos ?? []);
+
+  function openLightbox(i: number) {
+    lightboxIndex = i;
+    lightboxOpen = true;
+  }
+
+  function copyShare() {
+    navigator.clipboard.writeText(window.location.href);
+    shareText = 'copied';
+    setTimeout(() => (shareText = 'share'), 1500);
+  }
+
+  async function vote(reviewId: string, kind: 'accurate' | 'not_accurate') {
     await fetch('/api/votes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ review_id: reviewId, vote: voteType })
+      body: JSON.stringify({ review_id: reviewId, vote: kind })
     });
     location.reload();
   }
-
-  let reportingReviewId = $state<string | null>(null);
-  let reportReason = $state('');
 
   async function submitReport(reviewId: string) {
     if (!reportReason.trim()) return;
@@ -43,7 +55,6 @@
     });
     reportingReviewId = null;
     reportReason = '';
-    alert('Report submitted. Thank you.');
   }
 
   async function adminDeleteReview(reviewId: string) {
@@ -71,7 +82,7 @@
       }
       location.reload();
     } catch {
-      listingError = 'Network error';
+      listingError = 'network error';
     }
   }
 
@@ -80,661 +91,562 @@
     location.reload();
   }
 
-  function sourceIcon(source: string) {
-    const icons: Record<string, string> = {
-      zillow: 'Z', redfin: 'R', realtor: 'R', trulia: 'T',
-      apartments: 'A', craigslist: 'CL', facebook: 'FB', hotpads: 'HP'
-    };
-    return icons[source] || '🔗';
-  }
+  const sortedReviews = $derived(
+    sortMode === 'helpful'
+      ? [...data.reviews] // server already sorts by helpful
+      : [...data.reviews].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+  );
+
+  const accurateTone = $derived(
+    data.stats.accuratePercent >= 60
+      ? 'green'
+      : data.stats.accuratePercent >= 40
+        ? 'amber'
+        : 'red'
+  );
 </script>
 
 <svelte:head>
-  <title>{data.address.street}, {data.address.city}{data.address.state ? `, ${data.address.state}` : ''} — Is It Real?</title>
-  <meta name="description" content="{data.stats.totalReviews} review{data.stats.totalReviews !== 1 ? 's' : ''} for {data.address.street}, {data.address.city}. {data.stats.accuratePercent}% say listings are accurate." />
+  <title
+    >{data.address.street}, {data.address.city}{data.address.state
+      ? `, ${data.address.state}`
+      : ''} — isitreal.estate</title
+  >
+  <meta
+    name="description"
+    content="{data.stats.totalReviews} review{data.stats.totalReviews !== 1
+      ? 's'
+      : ''} for {data.address.street}, {data.address.city}. {data.stats
+      .accuratePercent}% say listings are accurate."
+  />
 </svelte:head>
 
-<main>
-  <div class="address-header">
-    <div class="title-row">
-      <h1>{data.address.street}</h1>
-      <button class="share-btn" onclick={() => { navigator.clipboard.writeText(window.location.href); shareText = 'Copied!'; setTimeout(() => shareText = 'Share', 2000); }}>
-        {shareText}
-      </button>
-    </div>
-    <p class="address-detail">{data.address.city}{data.address.state ? `, ${data.address.state}` : ''} {data.address.zip}</p>
-
-    {#if data.stats.totalReviews > 0}
-      <div class="stats-row">
-        <div class="stat">
-          <span class="stat-value">{data.stats.totalReviews}</span>
-          <span class="stat-label">reviews</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">{data.stats.accuratePercent}%</span>
-          <span class="stat-label">accurate</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">{data.stats.avgRating}</span>
-          <span class="stat-label">avg rating</span>
-        </div>
-      </div>
-    {/if}
+<div class="main">
+  <!-- Crumbs -->
+  <div class="crumbs">
+    <a href="/">search</a>
+    {#if data.address.state}<span class="sep">/</span><span>{data.address.state}</span>{/if}
+    {#if data.address.city}<span class="sep">/</span><span>{data.address.city}</span>{/if}
+    <span class="sep">/</span>
+    <span>{data.address.street}</span>
   </div>
 
-  {#if data.address.lat && data.address.lng}
-    <div class="address-map">
-      <Map
-        center={[data.address.lat, data.address.lng]}
-        zoom={16}
-        markers={[{ lat: data.address.lat, lng: data.address.lng, id: data.address.id, label: data.address.street }]}
-        singlePin={true}
-      />
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <h1>{data.address.street}</h1>
+      <div class="sub">
+        {data.address.city}{data.address.state ? `, ${data.address.state}` : ''}
+        {data.address.zip || ''}
+      </div>
+      <div class="sub-muted">
+        <button type="button" class="share" onclick={copyShare}>{shareText}</button>
+      </div>
     </div>
+
+    {#if data.address.lat && data.address.lng}
+      <div class="mini-map">
+        <Map
+          center={[data.address.lat, data.address.lng]}
+          zoom={16}
+          markers={[
+            {
+              lat: data.address.lat,
+              lng: data.address.lng,
+              id: data.address.id,
+              label: data.address.street
+            }
+          ]}
+          singlePin={true}
+        />
+        <div class="latlng">{data.address.lat.toFixed(4)}, {data.address.lng.toFixed(4)}</div>
+      </div>
+    {/if}
+  </header>
+
+  <!-- Stat pill bar -->
+  <div class="statbar">
+    <StatPill value={data.stats.totalReviews} label="reviews" />
+    <StatPill
+      value="{data.stats.accuratePercent}%"
+      label="listing accurate"
+      tone={accurateTone}
+    />
+    <StatPill value={data.stats.avgRating.toFixed(1)} label="avg rating" />
+    <StatPill value={data.stats.photoCount} label="photos of evidence" />
+  </div>
+
+  <!-- Evidence photo strip -->
+  {#if allPhotos.length > 0}
+    <section class="evidence">
+      <div class="section-label">
+        Evidence · {allPhotos.length} photo{allPhotos.length !== 1 ? 's' : ''} from visitors
+      </div>
+      <div class="strip">
+        {#each allPhotos as p, i}
+          <button
+            type="button"
+            class="tile"
+            onclick={() => openLightbox(i)}
+            aria-label="Open photo {i + 1}"
+          >
+            <img src="/uploads/{p.path}" alt="" loading="lazy" />
+          </button>
+        {/each}
+      </div>
+    </section>
   {/if}
 
-  {#if data.user}
-    <a href="/address/{data.address.id}/review" class="review-button">Leave a Review</a>
-  {:else}
-    <a href="/login" class="review-button secondary">Log in to leave a review</a>
-  {/if}
-
+  <!-- Listings -->
   <section class="listings">
-    <div class="section-header">
-      <h2>Listings</h2>
+    <div class="actions-row">
+      <div class="section-label inline">Listings · {data.listings.length}</div>
       {#if data.user}
-        <button class="add-listing-btn" onclick={() => showAddListing = !showAddListing}>
-          {showAddListing ? 'Cancel' : '+ Add Listing'}
+        <button
+          type="button"
+          class="linklike amber"
+          onclick={() => (showAddListing = !showAddListing)}
+        >
+          {showAddListing ? 'cancel' : '+ add listing'}
         </button>
       {/if}
     </div>
 
     {#if showAddListing}
-      <div class="add-listing-form">
+      <div class="add-listing">
         <input
           type="url"
-          placeholder="Paste listing URL (Zillow, Redfin, Craigslist, etc.)"
+          placeholder="Paste listing URL"
           bind:value={listingUrl}
-          class="listing-input"
         />
         <input
           type="text"
-          placeholder="Price (optional, e.g., $2,400/mo)"
+          placeholder="Price (optional, e.g. $2,400/mo)"
           bind:value={listingPrice}
-          class="listing-input price-input"
         />
         {#if listingError}
-          <div class="listing-error">{listingError}</div>
+          <div class="err">{listingError}</div>
         {/if}
-        <button class="submit-listing-btn" onclick={addListing} disabled={!listingUrl}>
-          Add Listing
+        <button
+          type="button"
+          class="btn-primary"
+          onclick={addListing}
+          disabled={!listingUrl}
+        >
+          Add listing
         </button>
       </div>
     {/if}
 
     {#if data.listings.length === 0 && !showAddListing}
-      <p class="empty">No listings linked yet.</p>
+      <p class="empty">no listings linked yet.</p>
     {:else}
-      {#each data.listings as listing}
-        <div class="listing-card">
-          <span class="listing-source">{sourceIcon(listing.source)}</span>
-          <div class="listing-info">
-            <a href={listing.url} target="_blank" rel="noopener" class="listing-url">
-              {listing.source !== 'other' ? listing.source.charAt(0).toUpperCase() + listing.source.slice(1) : listing.url}
-            </a>
-            {#if listing.price}
-              <span class="listing-price">{listing.price}</span>
-            {/if}
-            <span class="listing-meta">added by {listing.username}</span>
-          </div>
-          {#if data.user?.id === listing.user_id}
-            <button class="listing-delete" onclick={() => deleteListing(listing.id)}>×</button>
-          {/if}
-        </div>
-      {/each}
-    {/if}
-  </section>
-
-  <section class="reviews">
-    <h2>Reviews</h2>
-    {#if data.reviews.length === 0}
-      <p class="empty">No reviews yet. Be the first to share what you found.</p>
-    {:else}
-      {#each data.reviews as review}
-        <div class="review-card">
-          <div class="review-header">
-            <div>
-              <a href="/user/{review.username}" class="review-author">{review.username}</a>
-              <span class="review-date">
-                {review.visited_at ? `Visited ${new Date(review.visited_at).toLocaleDateString()}` : ''}
-              </span>
-            </div>
-            <div class="review-meta">
-              <span class="accuracy-badge" style="color: {accuracyColor(review.listing_accurate)}">
-                {accuracyLabel(review.listing_accurate)}
-              </span>
-              <span class="rating">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
-            </div>
-          </div>
-
-          {#if review.body}
-            <p class="review-body">{review.body}</p>
-          {/if}
-
-          {#if review.photos && review.photos.length > 0}
-            <div class="review-photos">
-              {#each review.photos as photo}
-                <img src="/uploads/{photo.path}" alt="Review photo" class="review-photo" />
-              {/each}
-            </div>
-          {/if}
-
-          <div class="review-footer">
-            {#if data.user}
-              <button class="vote-btn" onclick={() => vote(review.id, 'accurate')}>
-                Accurate ({review.accurate_count})
-              </button>
-              <button class="vote-btn" onclick={() => vote(review.id, 'not_accurate')}>
-                Not Accurate ({review.not_accurate_count})
-              </button>
+      <div class="listing-list">
+        {#each data.listings as listing}
+          <div class="listing">
+            <a href={listing.url} target="_blank" rel="noopener noreferrer">{listing.url}</a>
+            {#if listing.price}<span class="price">{listing.price}</span>{/if}
+            <span class="linking-user">· added by @{listing.username}</span>
+            {#if data.user && (data.user.id === listing.user_id || data.user.is_admin)}
               <button
-                class="vote-btn report-btn"
-                onclick={() => { reportingReviewId = reportingReviewId === review.id ? null : review.id; reportReason = ''; }}
+                type="button"
+                class="linklike danger"
+                onclick={() => deleteListing(listing.id)}
               >
-                Report
+                delete
               </button>
-              {#if data.user.is_admin}
-                <button class="vote-btn admin-btn" onclick={() => adminDeleteReview(review.id)}>
-                  Delete
-                </button>
-              {/if}
-            {:else}
-              <span class="vote-counts">
-                {review.accurate_count} accurate / {review.not_accurate_count} not accurate
-              </span>
             {/if}
           </div>
-          {#if reportingReviewId === review.id}
-            <div class="report-form">
-              <input
-                type="text"
-                class="report-input"
-                placeholder="Why are you reporting this review?"
-                bind:value={reportReason}
-              />
-              <button
-                class="report-submit"
-                onclick={() => submitReport(review.id)}
-                disabled={!reportReason.trim()}
-              >Submit Report</button>
-            </div>
-          {/if}
-        </div>
-      {/each}
+        {/each}
+      </div>
     {/if}
   </section>
-</main>
+
+  <!-- Actions row -->
+  <div class="actions-row reviews-head">
+    <div class="section-label inline">Reviews · {data.stats.totalReviews}</div>
+    <div class="actions-right">
+      <div class="sort">
+        <button
+          type="button"
+          class:active={sortMode === 'helpful'}
+          onclick={() => (sortMode = 'helpful')}
+        >
+          most helpful
+        </button>
+        <button
+          type="button"
+          class:active={sortMode === 'newest'}
+          onclick={() => (sortMode = 'newest')}
+        >
+          newest
+        </button>
+      </div>
+      {#if data.user}
+        <a href="/address/{data.address.id}/review" class="btn-primary cta">＋ Leave a review</a>
+      {:else}
+        <a href="/login?returnTo=/address/{data.address.id}" class="btn-ghost cta">
+          Log in to review
+        </a>
+      {/if}
+    </div>
+  </div>
+
+  <!-- Reviews -->
+  {#if sortedReviews.length === 0}
+    <p class="empty">no reviews yet. be the first to leave one.</p>
+  {:else}
+    {#each sortedReviews as review}
+      <div class="review-wrap">
+        <ReviewCard
+          {review}
+          canVote={!!data.user}
+          isAdmin={!!data.user?.is_admin}
+          onvote={(kind) => vote(review.id, kind)}
+          onreport={() => (reportingReviewId = review.id)}
+          onadmindelete={() => adminDeleteReview(review.id)}
+          onphoto={(i) => {
+            // find the global index for this review's photo i
+            const rev = review.photos?.[i];
+            if (!rev) return;
+            const idx = allPhotos.findIndex((p) => p.id === rev.id);
+            if (idx >= 0) openLightbox(idx);
+          }}
+        />
+
+        {#if reportingReviewId === review.id}
+          <div class="report-box">
+            <textarea
+              bind:value={reportReason}
+              placeholder="why are you reporting this review?"
+              rows="2"
+            ></textarea>
+            <div class="report-actions">
+              <button
+                type="button"
+                class="btn-ghost"
+                onclick={() => (reportingReviewId = null)}>Cancel</button
+              >
+              <button
+                type="button"
+                class="btn-primary"
+                disabled={!reportReason.trim()}
+                onclick={() => submitReport(review.id)}>Submit report</button
+              >
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/each}
+  {/if}
+</div>
+
+{#if lightboxOpen && allPhotos.length > 0}
+  <Lightbox
+    photos={allPhotos}
+    startIndex={lightboxIndex}
+    onclose={() => (lightboxOpen = false)}
+  />
+{/if}
 
 <style>
-  main {
-    max-width: 800px;
+  .main {
+    max-width: var(--content-max);
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: var(--content-pad-y) var(--content-pad-x) 80px;
   }
 
-  .address-header {
-    margin-bottom: 1.5rem;
+  /* Crumbs */
+  .crumbs {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--fg-faint);
+    margin-bottom: 20px;
+  }
+  .crumbs a {
+    color: var(--fg-mute);
+  }
+  .crumbs a:hover { color: var(--amber); }
+  .crumbs .sep {
+    margin: 0 6px;
+    color: var(--fg-faint);
   }
 
-  h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0 0 0.25rem;
+  /* Header */
+  .header {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 28px;
+    align-items: start;
+    margin-bottom: 28px;
   }
-
-  .address-detail {
-    color: var(--text-muted);
-    font-size: 1.1rem;
-    margin: 0 0 1rem;
+  @media (max-width: 720px) {
+    .header { grid-template-columns: 1fr; }
+    .mini-map { height: 220px; }
   }
-
-  .stats-row {
-    display: flex;
-    gap: 2rem;
+  .header h1 {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    margin: 0 0 6px 0;
   }
-
-  .stat {
-    display: flex;
-    flex-direction: column;
+  .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-bottom: 4px;
   }
-
-  .stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text);
+  .sub-muted {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
   }
-
-  .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .title-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .share-btn {
-    padding: 0.4rem 0.75rem;
-    background: none;
+  .share {
+    background: transparent;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-muted);
-    font-size: 0.85rem;
+    color: var(--fg-mute);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
     cursor: pointer;
-    font-family: var(--font-family);
-    white-space: nowrap;
-    flex-shrink: 0;
   }
+  .share:hover { background: var(--bg-2); color: var(--fg); }
 
-  .share-btn:hover {
-    background: var(--bg-sunken);
-    color: var(--text);
-  }
-
-  .address-map {
-    height: 250px;
-    margin-bottom: 1.5rem;
-    border-radius: 12px;
+  .mini-map {
+    position: relative;
+    height: 160px;
+    border: 1px solid var(--border);
     overflow: hidden;
   }
-
-  .review-button {
-    display: inline-block;
-    padding: 0.75rem 1.5rem;
-    background: var(--accent);
-    color: var(--text-inverse);
-    border-radius: 8px;
-    font-weight: 600;
-    text-decoration: none;
-    margin-bottom: 2rem;
+  :global(.mini-map .leaflet-container) { height: 100%; }
+  :global(.mini-map .leaflet-tile) {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.95) saturate(0.6);
+  }
+  :global(:root[data-theme="light"] .mini-map .leaflet-tile) { filter: none; }
+  .latlng {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-faint);
+    background: var(--bg);
+    padding: 2px 5px;
+    z-index: 500;
   }
 
-  .review-button:hover {
-    background: var(--accent-hover);
-    text-decoration: none;
-  }
-
-  .review-button.secondary {
-    background: var(--bg-sunken);
-    color: var(--text-muted);
+  /* Stat bar */
+  .statbar {
+    display: flex;
     border: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .statbar :global(.pill) {
+    border-right: 1px solid var(--border);
+  }
+  .statbar :global(.pill:last-child) {
+    border-right: none;
+  }
+  @media (max-width: 720px) {
+    .statbar { flex-wrap: wrap; }
+    .statbar :global(.pill) {
+      flex-basis: 50%;
+      border-bottom: 1px solid var(--border);
+    }
+    .statbar :global(.pill:nth-last-child(-n+2)) { border-bottom: none; }
+    .statbar :global(.pill:nth-child(2n)) { border-right: none; }
   }
 
-  .reviews h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 1rem;
-  }
-
-  .empty {
-    color: var(--text-muted);
-    text-align: center;
-    padding: 3rem 0;
-  }
-
-  .review-card {
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-  }
-
-  .review-header {
+  /* Evidence strip */
+  .evidence { margin-bottom: 28px; }
+  .strip {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
-  }
-
-  .review-author {
-    font-weight: 600;
-    color: var(--accent);
-  }
-
-  .review-date {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-left: 0.5rem;
-  }
-
-  .review-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .accuracy-badge {
-    font-weight: 700;
-    font-size: 0.85rem;
-  }
-
-  .rating {
-    color: var(--warning);
-    font-size: 1rem;
-  }
-
-  .review-body {
-    color: var(--text);
-    margin: 0 0 0.75rem;
-    line-height: 1.6;
-  }
-
-  .review-photos {
-    display: flex;
-    gap: 0.5rem;
+    gap: 4px;
     overflow-x: auto;
-    margin-bottom: 0.75rem;
+    padding-bottom: 4px;
   }
-
-  .review-photo {
-    width: 120px;
-    height: 90px;
+  .tile {
+    flex: 0 0 auto;
+    width: 240px;
+    height: 180px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-1);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .tile:hover { border-color: var(--amber); }
+  .tile img {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid var(--border);
+    display: block;
   }
 
-  .review-footer {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .vote-btn {
-    padding: 0.4rem 0.75rem;
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    cursor: pointer;
-    font-family: var(--font-family);
-  }
-
-  .vote-btn:hover {
-    background: var(--bg-sunken);
-    color: var(--text);
-  }
-
-  .vote-counts {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-  }
-
-  .report-btn {
-    margin-left: auto;
-    color: var(--text-muted);
-    border-color: transparent;
-  }
-
-  .report-btn:hover {
-    color: var(--warning);
-    border-color: var(--warning);
-    background: none;
-  }
-
-  .admin-btn {
-    color: var(--danger);
-    border-color: var(--danger);
-  }
-
-  .admin-btn:hover {
-    background: var(--danger);
-    color: var(--text-inverse);
-  }
-
-  .report-form {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .report-input {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-family);
-    font-size: 0.85rem;
-  }
-
-  .report-input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-
-  .report-submit {
-    padding: 0.5rem 0.75rem;
-    background: var(--warning);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: var(--font-family);
-    white-space: nowrap;
-  }
-
-  .report-submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .listings {
-    margin-bottom: 2rem;
-  }
-
-  .section-header {
+  /* Actions row */
+  .actions-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
+    align-items: flex-end;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
   }
-
-  .section-header h2 {
-    margin: 0;
+  .section-label.inline {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
   }
-
-  .add-listing-btn {
-    padding: 0.4rem 0.75rem;
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    cursor: pointer;
-    font-family: var(--font-family);
-  }
-
-  .add-listing-btn:hover {
-    background: var(--bg-sunken);
-    color: var(--text);
-  }
-
-  .add-listing-form {
+  .actions-right {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: var(--bg-raised);
+    align-items: center;
+    gap: 12px;
+  }
+  .sort {
+    display: flex;
     border: 1px solid var(--border);
-    border-radius: 8px;
   }
-
-  .listing-input {
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-family);
-    font-size: 0.95rem;
-  }
-
-  .listing-input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-
-  .price-input {
-    max-width: 200px;
-  }
-
-  .listing-error {
-    color: var(--danger);
-    font-size: 0.85rem;
-  }
-
-  .submit-listing-btn {
-    align-self: flex-start;
-    padding: 0.5rem 1rem;
-    background: var(--accent);
-    color: var(--text-inverse);
+  .sort button {
+    background: transparent;
     border: none;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
+    color: var(--fg-mute);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
     cursor: pointer;
-    font-family: var(--font-family);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .sort button + button {
+    border-left: 1px solid var(--border);
+  }
+  .sort button:hover { color: var(--fg); }
+  .sort button.active {
+    background: var(--bg-2);
+    color: var(--fg);
   }
 
-  .submit-listing-btn:hover:not(:disabled) {
-    background: var(--accent-hover);
+  .cta {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 14px;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
   }
 
-  .submit-listing-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  /* Reviews */
+  .reviews-head {
+    margin-bottom: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
   }
+  .review-wrap { position: relative; }
 
-  .listing-card {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-raised);
+  /* Report box */
+  .report-box {
+    padding: 16px;
+    border-left: 2px solid var(--amber);
+    background: var(--bg-1);
+    margin: -10px 0 20px 0;
+  }
+  .report-box textarea {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 13px;
+    background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
+    padding: 8px;
+    resize: vertical;
   }
-
-  .listing-source {
-    width: 32px;
-    height: 32px;
+  .report-actions {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-sunken);
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    flex-shrink: 0;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
   }
 
-  .listing-info {
-    flex: 1;
+  /* Listings */
+  .listings {
+    margin-bottom: 28px;
+  }
+  .add-listing {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 16px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+  }
+  .add-listing input {
+    flex: 1 1 240px;
+    background: var(--bg);
+  }
+  .add-listing .btn-primary {
+    padding: 8px 16px;
+  }
+  .err {
+    color: var(--red);
+    font-family: var(--mono);
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .listing-list {
+    margin-top: 10px;
+  }
+  .listing {
+    display: flex;
     align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    flex-wrap: wrap;
+  }
+  .listing:first-of-type { border-top: none; }
+  .listing a {
+    color: var(--blue);
+    word-break: break-all;
+  }
+  .listing .price {
+    color: var(--fg);
+  }
+  .linking-user { color: var(--fg-faint); }
+
+  /* Generic */
+  .empty {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+    padding: 20px 0;
   }
 
-  .listing-url {
-    font-weight: 600;
-  }
-
-  .listing-price {
-    color: var(--success);
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-
-  .listing-meta {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-  }
-
-  .listing-delete {
-    background: none;
+  .linklike {
+    background: transparent;
     border: none;
-    color: var(--text-muted);
-    font-size: 1.25rem;
+    padding: 0;
+    color: var(--fg-mute);
+    font-family: var(--mono);
+    font-size: 12px;
     cursor: pointer;
-    padding: 0 0.25rem;
-    opacity: 0;
-    transition: opacity 0.15s;
   }
+  .linklike:hover { color: var(--fg); }
+  .linklike.amber { color: var(--amber); }
+  .linklike.amber:hover { color: var(--amber-dim); }
+  .linklike.danger:hover { color: var(--red); }
 
-  .listing-card:hover .listing-delete {
-    opacity: 1;
-  }
-
-  .listing-delete:hover {
-    color: var(--danger);
-  }
-
-  @media (max-width: 640px) {
-    main {
-      padding: 1.5rem 1rem;
-    }
-
-    h1 {
-      font-size: 1.5rem;
-    }
-
-    .stats-row {
-      gap: 1rem;
-    }
-
-    .stat-value {
-      font-size: 1.25rem;
-    }
-
-    .review-header {
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .review-photos {
-      gap: 0.25rem;
-    }
-
-    .review-photo {
-      width: 90px;
-      height: 68px;
-    }
-
-    .report-form {
-      flex-direction: column;
-    }
-
-    .title-row {
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
   }
 </style>

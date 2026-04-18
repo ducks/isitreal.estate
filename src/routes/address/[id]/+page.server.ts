@@ -50,7 +50,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     ? reviewsResult.rows.reduce((s, r) => s + r.rating, 0) / totalReviews
     : 0;
 
-  // Load listings
+  // Listings
   const listingsResult = await query(
     `SELECT l.*, u.username
      FROM address_listings l
@@ -66,11 +66,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       ...r,
       photos: photos.filter(p => p.review_id === r.id)
     })),
+    allPhotos: photos,
     listings: listingsResult.rows,
     stats: {
       totalReviews,
       accuratePercent: totalReviews > 0 ? Math.round((accurateReviews / totalReviews) * 100) : 0,
-      avgRating: Math.round(avgRating * 10) / 10
+      avgRating: Math.round(avgRating * 10) / 10,
+      photoCount: photos.length
     },
     user: locals.user ?? null
   };
